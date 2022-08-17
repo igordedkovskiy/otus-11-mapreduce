@@ -25,23 +25,35 @@ set_target_properties(framework_lib PROPERTIES
 target_include_directories(framework_lib PRIVATE
     #${SQLite3_INCLUDE_DIRS}
 )
-target_link_libraries(db_lib PRIVATE
+target_link_libraries(framework_lib PRIVATE
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+
+add_executable(client
+    "client.cpp"
+)
+set_target_properties(client PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+target_include_directories(client PRIVATE
+    ${CMAKE_BINARY_DIR}
+)
+target_link_libraries(client PRIVATE
+    framework_lib
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
 add_executable(${PROJECT_NAME}
     "main.cpp"
 )
-
 set_target_properties(${PROJECT_NAME} PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )
-
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_BINARY_DIR}
 )
-
 target_link_libraries(${PROJECT_NAME} PRIVATE
     framework_lib
     ${CMAKE_THREAD_LIBS_INIT}
