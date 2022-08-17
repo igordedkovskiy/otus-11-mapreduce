@@ -29,17 +29,17 @@ target_link_libraries(framework_lib PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
-add_executable(client
-    "client.cpp"
+add_executable(prefix
+    "prefix.cpp"
 )
-set_target_properties(client PROPERTIES
+set_target_properties(prefix PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )
-target_include_directories(client PRIVATE
+target_include_directories(prefix PRIVATE
     ${CMAKE_BINARY_DIR}
 )
-target_link_libraries(client PRIVATE
+target_link_libraries(prefix PRIVATE
     framework_lib
     ${CMAKE_THREAD_LIBS_INIT}
 )
