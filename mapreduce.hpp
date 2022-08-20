@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <vector>
+#include <unordered_map>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <thread>
 
@@ -32,7 +34,7 @@ namespace mapreduce
 // Всё в этом файле - это рекомендация.
 // Если что-то будет слишком сложно реализовать, идите на компромисс, пренебрегайте чем-нибудь.
 // Лучше сделать что-нибудь, чем застрять на каком-нибудь моменте и не сделать ничего.
-template<typename MapperT, typename ReducerT>
+template<typename MapperT, typename ReducerT, typename KeyT>
 class Framework
 {
 public:
@@ -44,19 +46,24 @@ public:
 private:
     struct Block
     {
-        std::size_t m_from;
-        std::size_t m_to;
+        std::size_t m_start{0};
+        std::size_t m_end{0};
     };
 
     using input_blocks_t = std::vector<Block>;
-    input_blocks_t split_input(const std::filesystem::path& file);
+    input_blocks_t split_input(const std::filesystem::path& file_path);
 
-    using mapped_block_t = std::vector<std::pair<int, int>>;
+    using mapped_block_t = std::vector<std::pair<KeyT, std::size_t>>;
     using mapped_t = std::vector<mapped_block_t>;
-    mapped_t map(const input_blocks_t& blocks);
-    void shuffle();
-    void reduce();
 
+    /// \returns num_of_mappers vectors of pairs
+    mapped_t map(const input_blocks_t& blocks);
+
+    /// \returns num_of_reducers vectors of pairs
+    mapped_t shuffle(mapped_t& mapped);
+
+    using reduced_t = mapped_block_t;
+    reduced_t reduce(mapped_t& mapped);
 
     std::size_t m_num_of_mappers{0};
     std::size_t m_num_of_reducers{0};
@@ -65,8 +72,8 @@ private:
     ReducerT m_reducer;
 };
 
-template<typename MapperT, typename ReducerT>
-Framework<MapperT, ReducerT>::Framework(MapperT&& mapper, std::size_t num_of_mappers,
+template<typename MapperT, typename ReducerT, typename Key>
+Framework<MapperT, ReducerT, Key>::Framework(MapperT&& mapper, std::size_t num_of_mappers,
                                         ReducerT&& reducer, std::size_t num_of_reducers):
     m_mapper{std::forward<decltype(mapper)>(mapper)},
     m_num_of_mappers{num_of_mappers},
@@ -107,8 +114,8 @@ Framework<MapperT, ReducerT>::Framework(MapperT&& mapper, std::size_t num_of_map
 // Применяем к строкам функцию reducer
 // Результат сохраняется в файловую систему
 //             (во многих задачах выход редьюсера - большие данные, хотя в нашей задаче можно написать функцию reduce так, чтобы выход не был большим)
-template<typename MapperT, typename ReducerT>
-void Framework<MapperT, ReducerT>::run(const std::filesystem::path &input, const std::filesystem::path &output)
+template<typename MapperT, typename ReducerT, typename Key>
+void Framework<MapperT, ReducerT, Key>::run(const std::filesystem::path &input, const std::filesystem::path &output)
 {
     // split input data into num_of_mappers blocks
     auto blocks {split_input(input)};
@@ -131,30 +138,77 @@ void Framework<MapperT, ReducerT>::run(const std::filesystem::path &input, const
 
 }
 
-template<typename MapperT, typename ReducerT>
-std::vector<typename Framework<MapperT, ReducerT>::Block>
-Framework<MapperT, ReducerT>::split_input(const std::filesystem::path &file)
+// Эта функция не читает весь файл.
+// Определяем размер файла в байтах.
+// Делим размер на количество блоков - получаем границы блоков.
+// Читаем данные только вблизи границ.
+// Выравниваем границы блоков по границам строк.
+template<typename MapperT, typename ReducerT, typename Key>
+typename Framework<MapperT, ReducerT, Key>::input_blocks_t
+Framework<MapperT, ReducerT, Key>::split_input(const std::filesystem::path& file_path)
 {
-    // Эта функция не читает весь файл.
-    // Определяем размер файла в байтах.
-    // Делим размер на количество блоков - получаем границы блоков.
-    // Читаем данные только вблизи границ.
-    // Выравниваем границы блоков по границам строк.
+    const auto fsize{std::filesystem::file_size(file_path)};
+    const auto block_size{(fsize % m_num_of_mappers ?
+                           fsize / m_num_of_mappers :
+                           fsize / m_num_of_mappers + 1)};
+    input_blocks_t blocks;
+    blocks.reserve(m_num_of_mappers);
+    std::fstream file{file_path.filename(), std::ios::in};
+    std::string line;
+    for(std::size_t start{0}; start < fsize;)
+    {
+        file.seekg(start + block_size);
+        std::getline(file, line);
+        const std::size_t end = file.tellg();
+        blocks.emplace_back({start, end});
+        start = end + 1;
+    }
+    return blocks;
 }
 
-template<typename MapperT, typename ReducerT>
-typename Framework<MapperT, ReducerT>::mapped_t
-Framework<MapperT, ReducerT>::map(const input_blocks_t& blocks)
+template<typename MapperT, typename ReducerT, typename Key>
+typename Framework<MapperT, ReducerT, Key>::mapped_t
+Framework<MapperT, ReducerT, Key>::map(const input_blocks_t& blocks)
 {
     std::vector<std::thread> mappers;
     mappers.reserve(m_num_of_mappers);
     mapped_t result(m_num_of_mappers, mapped_block_t{});
     for(std::size_t cntr{0}; cntr < 0; ++cntr)
-//    for(const auto& block:blocks)
         mappers.emplace_back(std::thread{m_mapper, std::ref(blocks[cntr]), std::ref(result[cntr])});
     for(auto& mapper:mappers)
         mapper.join();
     return result;
+}
+
+template<typename MapperT, typename ReducerT, typename KeyT>
+typename Framework<MapperT, ReducerT, KeyT>::mapped_t
+Framework<MapperT, ReducerT, KeyT>::shuffle(mapped_t& mapped)
+{
+    // sort
+    auto cmp = [](const auto& l, const auto& r)
+    {
+        return (std::hash<decltype(l.first)>{}(l.first) <
+                std::hash<decltype(r.first)>{}(r.first));
+    };
+    for(auto& block:mapped)
+        std::sort(std::begin(block), std::end(block), cmp);
+
+    // shuffle
+    mapped_t shuffled;
+    shuffled.reserve(m_num_of_reducers);
+    std::size_t num_of_pairs{0};
+    for(const auto& block:mapped)
+        num_of_pairs += block.size();
+    const auto num_of_pairs_in_block{(num_of_pairs % m_num_of_reducers ?
+                                      num_of_pairs / m_num_of_reducers :
+                                      num_of_pairs / m_num_of_reducers + 1)};
+    for(auto mblock{std::begin(mapped)}; mblock != std::end(mapped); ++mblock)
+    {
+        //mapped_block_t block;
+        //block.reserve(num_of_pairs_in_block);
+        //shuffled.emplace_back(std::move(block));
+        //
+    }
 }
 
 }
