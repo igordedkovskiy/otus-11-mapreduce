@@ -49,19 +49,17 @@ private:
     using input_blocks_t = std::vector<Block>;
     input_blocks_t split_input(const std::filesystem::path& file_path);
 
+    using pair_t = std::pair<KeyT, std::size_t>;
+    using block_of_pairs_t = std::list<pair_t>;
+    using pairs_t = std::vector<block_of_pairs_t>;
+
     /// \returns num_of_mappers vectors of pairs
-    using mapped_block_t = std::list<std::pair<KeyT, std::size_t>>;
-    //using mapped_block_t = std::unordered_map<KeyT, std::size_t>;
-    using mapped_t = std::vector<mapped_block_t>;
-    mapped_t map(const input_blocks_t& blocks);
+    pairs_t map(const std::filesystem::path& fpath, const input_blocks_t& blocks);
 
     /// \returns num_of_reducers vectors of pairs
-    using shuffled_block_t = std::list<std::pair<KeyT, std::size_t>>;
-    using shuffled_t = std::vector<shuffled_block_t>;
-    shuffled_t shuffle(mapped_t& mapped);
+    pairs_t shuffle(pairs_t& mapped);
 
-    using reduced_t = shuffled_block_t;
-    reduced_t reduce(const shuffled_t& shuffled);
+    pairs_t reduce(const pairs_t& shuffled);
 
     std::size_t m_num_of_mappers{0};
     std::size_t m_num_of_reducers{0};
@@ -70,12 +68,14 @@ private:
     ReducerT m_reducer;
 };
 
-template<typename MapperT, typename ReducerT, typename Key>
-Framework<MapperT, ReducerT, Key>::Framework(const MapperT& mapper, std::size_t num_of_mappers,
+template<typename MapperT, typename ReducerT, typename KeyT>
+Framework<MapperT, ReducerT, KeyT>::Framework(const MapperT& mapper, std::size_t num_of_mappers,
                                              const ReducerT& reducer, std::size_t num_of_reducers):
-    m_mapper{std::forward<decltype(mapper)>(mapper)},
+    //m_mapper{std::forward<decltype(mapper)>(mapper)},
+    m_mapper{mapper},
     m_num_of_mappers{num_of_mappers},
-    m_reducer{std::forward<decltype(reducer)>(reducer)},
+    //m_reducer{std::forward<decltype(reducer)>(reducer)},
+    m_reducer{reducer},
     m_num_of_reducers{num_of_reducers}
 {}
 
@@ -112,28 +112,15 @@ Framework<MapperT, ReducerT, Key>::Framework(const MapperT& mapper, std::size_t 
 // Применяем к строкам функцию reducer
 // Результат сохраняется в файловую систему
 //             (во многих задачах выход редьюсера - большие данные, хотя в нашей задаче можно написать функцию reduce так, чтобы выход не был большим)
-template<typename MapperT, typename ReducerT, typename Key>
-void Framework<MapperT, ReducerT, Key>::run(const std::filesystem::path &input, const std::filesystem::path &output)
+template<typename MapperT, typename ReducerT, typename KeyT>
+void Framework<MapperT, ReducerT, KeyT>::run(const std::filesystem::path& input,
+                                             const std::filesystem::path& output)
 {
-    // split input data into num_of_mappers blocks
     auto blocks {split_input(input)};
-
-    // map
-    map(blocks);
-
-    // shuffle: sort and split into num_of_reducers blocks
-    shuffle();
-
-    // reduce
-    {
-        std::vector<std::thread> reducers;
-        reducers.reserve(m_num_of_reducers);
-        for(auto& block:blocks)
-            reducers.emplace_back(std::thread{m_reducer, std::ref(block)});
-        for(auto& reducer:reducers)
-            reducer.join();
-    }
-
+    auto mapped{map(input, blocks)};
+    auto shuffled{shuffle(mapped)};
+    auto result{reduce(shuffled)};
+    // write into output
 }
 
 // Эта функция не читает весь файл.
@@ -141,9 +128,9 @@ void Framework<MapperT, ReducerT, Key>::run(const std::filesystem::path &input, 
 // Делим размер на количество блоков - получаем границы блоков.
 // Читаем данные только вблизи границ.
 // Выравниваем границы блоков по границам строк.
-template<typename MapperT, typename ReducerT, typename Key>
-typename Framework<MapperT, ReducerT, Key>::input_blocks_t
-Framework<MapperT, ReducerT, Key>::split_input(const std::filesystem::path& file_path)
+template<typename MapperT, typename ReducerT, typename KeyT>
+typename Framework<MapperT, ReducerT, KeyT>::input_blocks_t
+Framework<MapperT, ReducerT, KeyT>::split_input(const std::filesystem::path& file_path)
 {
     const auto fsize{std::filesystem::file_size(file_path)};
     const auto block_size{(fsize % m_num_of_mappers ?
@@ -158,29 +145,35 @@ Framework<MapperT, ReducerT, Key>::split_input(const std::filesystem::path& file
         file.seekg(start + block_size);
         std::getline(file, line);
         const std::size_t end = file.tellg();
-        blocks.emplace_back({start, end});
+        blocks.emplace_back(Block{start, end});
         start = end + 1;
     }
     return blocks;
 }
 
-template<typename MapperT, typename ReducerT, typename Key>
-typename Framework<MapperT, ReducerT, Key>::mapped_t
-Framework<MapperT, ReducerT, Key>::map(const input_blocks_t& blocks)
+template<typename MapperT, typename ReducerT, typename KeyT>
+typename Framework<MapperT, ReducerT, KeyT>::pairs_t
+Framework<MapperT, ReducerT, KeyT>::map(const std::filesystem::path& fpath,
+                                        const input_blocks_t& blocks)
 {
     std::vector<std::thread> mappers;
     mappers.reserve(m_num_of_mappers);
-    mapped_t result(m_num_of_mappers, mapped_block_t{});
-    for(std::size_t cntr{0}; cntr < 0; ++cntr)
-        mappers.emplace_back(std::thread{m_mapper, std::ref(blocks[cntr]), std::ref(result[cntr])});
-    for(auto& mapper:mappers)
-        mapper.join();
+    pairs_t result(m_num_of_mappers, block_of_pairs_t{});
+    for(std::size_t cntr{0}; cntr < m_num_of_mappers; ++cntr)
+        mappers.emplace_back(std::thread{m_mapper,
+                                         std::ref(fpath),
+                                         //std::ref(blocks[cntr]),
+                                         blocks[cntr].m_start,
+                                         blocks[cntr].m_end,
+                                         std::ref(result[cntr])});
+    for(auto& reducer:mappers)
+        reducer.join();
     return result;
 }
 
 template<typename MapperT, typename ReducerT, typename KeyT>
-typename Framework<MapperT, ReducerT, KeyT>::shuffled_t
-Framework<MapperT, ReducerT, KeyT>::shuffle(mapped_t& mapped)
+typename Framework<MapperT, ReducerT, KeyT>::pairs_t
+Framework<MapperT, ReducerT, KeyT>::shuffle(pairs_t& mapped)
 {
     // sort
     auto cmp = [](const auto& l, const auto& r)
@@ -189,10 +182,10 @@ Framework<MapperT, ReducerT, KeyT>::shuffle(mapped_t& mapped)
                 std::hash<decltype(r.first)>{}(r.first));
     };
     for(auto& block:mapped)
-        block.sort(std::begin(block), std::end(block), cmp);
+        block.sort(cmp);
 
     // shuffle
-    shuffled_t shuffled;
+    pairs_t shuffled;
     shuffled.reserve(m_num_of_reducers);
     std::size_t num_of_pairs{0};
     for(const auto& block:mapped)
@@ -220,14 +213,16 @@ Framework<MapperT, ReducerT, KeyT>::shuffle(mapped_t& mapped)
 }
 
 template<typename MapperT, typename ReducerT, typename KeyT>
-typename Framework<MapperT, ReducerT, KeyT>::reduced_t
-Framework<MapperT, ReducerT, KeyT>::reduce(const shuffled_t& shuffled)
+typename Framework<MapperT, ReducerT, KeyT>::pairs_t
+Framework<MapperT, ReducerT, KeyT>::reduce(const pairs_t& shuffled)
 {
     std::vector<std::thread> reducers;
     reducers.reserve(m_num_of_reducers);
-    reduced_t result(m_num_of_reducers, shuffled_block_t{});
-    for(std::size_t cntr{0}; cntr < 0; ++cntr)
-        reducers.emplace_back(std::thread{m_reducer, std::ref(shuffled[cntr]), std::ref(result[cntr])});
+    pairs_t result(m_num_of_reducers, block_of_pairs_t{});
+    for(std::size_t cntr{0}; cntr < m_num_of_reducers; ++cntr)
+        reducers.emplace_back(std::thread{m_reducer,
+                                          std::ref(shuffled[cntr]),
+                                          std::ref(result[cntr])});
     for(auto& reducer:reducers)
         reducer.join();
     return result;

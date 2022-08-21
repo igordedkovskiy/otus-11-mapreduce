@@ -21,21 +21,33 @@
 int main() {
     std::filesystem::path input("emails.txt");
     std::filesystem::path output("out");
-    constexpr std::size_t mappers_count = 3;
-    constexpr std::size_t reducers_count = 2;
+    constexpr std::size_t num_of_mappers = 3;
+    constexpr std::size_t num_of_reducers = 2;
 
-    auto mapper = []()
+    struct Block
+    {
+        std::size_t m_start{0};
+        std::size_t m_end{0};
+    };
+
+    using key_t = std::string;
+    using pair_t = std::pair<key_t, std::size_t>;
+    using block_of_pairs_t = std::list<pair_t>;
+    using pairs_t = std::vector<block_of_pairs_t>;
+
+    //auto mapper = [](const std::filesystem::path& fpath, const Block& block, block_of_pairs_t& out)
+    auto mapper = [](const std::filesystem::path& fpath, std::size_t start, std::size_t end, block_of_pairs_t& out)
     {
         ;
     };
 
-    auto reducer = []()
+    auto reducer = [](const block_of_pairs_t& in, block_of_pairs_t& out)
     {
         ;
     };
 
-    mapreduce::Framework<decltype(mapper), decltype(reducer), std::size_t>
-            mr{std::move(mapper), mappers_count, std::move(reducer), reducers_count};
+    mapreduce::Framework<decltype(mapper), decltype(reducer), key_t>
+            mr{mapper, num_of_mappers, reducer, num_of_reducers};
 
     //цикл по длине префикса
     {
