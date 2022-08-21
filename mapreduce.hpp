@@ -12,35 +12,30 @@
 namespace mapreduce
 {
 
-// Это MapReduce фреймворк.
-// Он универсальный.
-// Он может выполнять разные map_reduce задачи.
-// Он просто обрабатывает какие-то данные с помощью каких-то функций в нескольких потоках.
-// Он ничего не знает о задаче, которую решает.
-// Здесь не должно быть кода, завязанного на конкретную задачу - определение длины префикса.
+// Это MapReduce фреймворк. Он универсальный и ничего не знает о задаче, которую решает.
+// Здесь не должно быть кода, завязанного на конкретную задачу.
 //
 // С помощью этого фреймворка должны решаться разные задачи.
-// Когда напишете это, попробуйте решить с помощью этого фреймворка все задачи, которые мы разбирали на лекции.
+// Когда напишете это, попробуйте решить с помощью этого фреймворка все задачи, которые мы разбирали
+// на лекции.
 //
 // Это наш самописный аналог hadoop mapreduce.
-// Он на самом деле не работает с по-настоящему большими данными, потому что выполняется на одной машине.
-// Но мы делаем вид, что данных много, и представляем, что наши потоки - это процессы на разных узлах.
+// Он на самом деле не работает с по-настоящему большими данными, потому что выполняется на одной
+// машине. Но мы делаем вид, что данных много, и представляем, что наши потоки - это процессы на
+// разных узлах.
 //
-// Ни один из потоков не должен полностью загружать свои данные в память или пробегаться по всем данным.
-// Каждый из потоков обрабатывает только свой блок.
+// Ни один из потоков не должен полностью загружать свои данные в память или пробегаться по всем
+// данным. Каждый из потоков обрабатывает только свой блок.
 //
-// На самом деле даже один блок данных не должен полностью грузиться в оперативку, а должен обрабатываться построчно.
-// Но в домашней работе можем этим пренебречь и загрузить один блок в память одним потоком.
-//
-// Всё в этом файле - это рекомендация.
-// Если что-то будет слишком сложно реализовать, идите на компромисс, пренебрегайте чем-нибудь.
-// Лучше сделать что-нибудь, чем застрять на каком-нибудь моменте и не сделать ничего.
+// На самом деле даже один блок данных не должен полностью грузиться в оперативку, а должен
+// обрабатываться построчно. Но в домашней работе можем этим пренебречь и загрузить один блок в
+// память одним потоком.
 template<typename MapperT, typename ReducerT, typename KeyT>
 class Framework
 {
 public:
-    Framework(MapperT&& mapper, std::size_t num_of_mappers,
-              ReducerT&& reducer, std::size_t num_of_reducers);
+    Framework(const MapperT& mapper, std::size_t num_of_mappers,
+              const ReducerT& reducer, std::size_t num_of_reducers);
 
     void run(const std::filesystem::path& input, const std::filesystem::path& output);
 
@@ -61,7 +56,7 @@ private:
     mapped_t map(const input_blocks_t& blocks);
 
     /// \returns num_of_reducers vectors of pairs
-    using shuffled_block_t = std::list<KeyT, std::size_t>;
+    using shuffled_block_t = std::list<std::pair<KeyT, std::size_t>>;
     using shuffled_t = std::vector<shuffled_block_t>;
     shuffled_t shuffle(mapped_t& mapped);
 
@@ -76,8 +71,8 @@ private:
 };
 
 template<typename MapperT, typename ReducerT, typename Key>
-Framework<MapperT, ReducerT, Key>::Framework(MapperT&& mapper, std::size_t num_of_mappers,
-                                        ReducerT&& reducer, std::size_t num_of_reducers):
+Framework<MapperT, ReducerT, Key>::Framework(const MapperT& mapper, std::size_t num_of_mappers,
+                                             const ReducerT& reducer, std::size_t num_of_reducers):
     m_mapper{std::forward<decltype(mapper)>(mapper)},
     m_num_of_mappers{num_of_mappers},
     m_reducer{std::forward<decltype(reducer)>(reducer)},
@@ -206,24 +201,18 @@ Framework<MapperT, ReducerT, KeyT>::shuffle(mapped_t& mapped)
                                       num_of_pairs / m_num_of_reducers :
                                       num_of_pairs / m_num_of_reducers + 1)};
     auto cur = std::begin(*std::begin(mapped))->first;
-    shuffled.emplace_back(decltype(shuffled)::value_type(*std::begin(*std::begin(mapped))));
+    shuffled.emplace_back(typename decltype(shuffled)::value_type(1, std::move(*std::begin(*std::begin(mapped)))));
     for(auto& block:mapped)
     {
         for(auto it{std::begin(block)}; it != std::end(block);)
         {
-            if(it->first == cur)
+            if(it->first == cur || shuffled.back().size() < num_of_pairs_in_block)
+                shuffled.back().emplace_back(std::move(*it));
+            else
             {
-                shuffled.back().emplace_back(*it);
-                it = block.erase(it);
-                continue;
+                cur = it->first;
+                shuffled.emplace_back(typename decltype(shuffled)::value_type(1, std::move(*it)));
             }
-            if(shuffled.back().size() < num_of_pairs_in_block)
-            {
-                shuffled.back().emplace_back(*it);
-                it = block.erase(it);
-                continue;
-            }
-            shuffled.emplace_back(decltype(shuffled)::value_type(*it));
             it = block.erase(it);
         }
     }
