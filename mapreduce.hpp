@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <list>
 #include <unordered_map>
 #include <filesystem>
 #include <fstream>
@@ -53,17 +54,19 @@ private:
     using input_blocks_t = std::vector<Block>;
     input_blocks_t split_input(const std::filesystem::path& file_path);
 
-    using mapped_block_t = std::vector<std::pair<KeyT, std::size_t>>;
-    using mapped_t = std::vector<mapped_block_t>;
-
     /// \returns num_of_mappers vectors of pairs
+    using mapped_block_t = std::list<std::pair<KeyT, std::size_t>>;
+    //using mapped_block_t = std::unordered_map<KeyT, std::size_t>;
+    using mapped_t = std::vector<mapped_block_t>;
     mapped_t map(const input_blocks_t& blocks);
 
     /// \returns num_of_reducers vectors of pairs
-    mapped_t shuffle(mapped_t& mapped);
+    using shuffled_block_t = std::list<KeyT, std::size_t>;
+    using shuffled_t = std::vector<shuffled_block_t>;
+    shuffled_t shuffle(mapped_t& mapped);
 
-    using reduced_t = mapped_block_t;
-    reduced_t reduce(mapped_t& mapped);
+    using reduced_t = shuffled_block_t;
+    reduced_t reduce(const shuffled_t& shuffled);
 
     std::size_t m_num_of_mappers{0};
     std::size_t m_num_of_reducers{0};
@@ -181,7 +184,7 @@ Framework<MapperT, ReducerT, Key>::map(const input_blocks_t& blocks)
 }
 
 template<typename MapperT, typename ReducerT, typename KeyT>
-typename Framework<MapperT, ReducerT, KeyT>::mapped_t
+typename Framework<MapperT, ReducerT, KeyT>::shuffled_t
 Framework<MapperT, ReducerT, KeyT>::shuffle(mapped_t& mapped)
 {
     // sort
@@ -191,10 +194,10 @@ Framework<MapperT, ReducerT, KeyT>::shuffle(mapped_t& mapped)
                 std::hash<decltype(r.first)>{}(r.first));
     };
     for(auto& block:mapped)
-        std::sort(std::begin(block), std::end(block), cmp);
+        block.sort(std::begin(block), std::end(block), cmp);
 
     // shuffle
-    mapped_t shuffled;
+    shuffled_t shuffled;
     shuffled.reserve(m_num_of_reducers);
     std::size_t num_of_pairs{0};
     for(const auto& block:mapped)
@@ -202,13 +205,43 @@ Framework<MapperT, ReducerT, KeyT>::shuffle(mapped_t& mapped)
     const auto num_of_pairs_in_block{(num_of_pairs % m_num_of_reducers ?
                                       num_of_pairs / m_num_of_reducers :
                                       num_of_pairs / m_num_of_reducers + 1)};
-    for(auto mblock{std::begin(mapped)}; mblock != std::end(mapped); ++mblock)
+    auto cur = std::begin(*std::begin(mapped))->first;
+    shuffled.emplace_back(decltype(shuffled)::value_type(*std::begin(*std::begin(mapped))));
+    for(auto& block:mapped)
     {
-        //mapped_block_t block;
-        //block.reserve(num_of_pairs_in_block);
-        //shuffled.emplace_back(std::move(block));
-        //
+        for(auto it{std::begin(block)}; it != std::end(block);)
+        {
+            if(it->first == cur)
+            {
+                shuffled.back().emplace_back(*it);
+                it = block.erase(it);
+                continue;
+            }
+            if(shuffled.back().size() < num_of_pairs_in_block)
+            {
+                shuffled.back().emplace_back(*it);
+                it = block.erase(it);
+                continue;
+            }
+            shuffled.emplace_back(decltype(shuffled)::value_type(*it));
+            it = block.erase(it);
+        }
     }
+    return shuffled;
+}
+
+template<typename MapperT, typename ReducerT, typename KeyT>
+typename Framework<MapperT, ReducerT, KeyT>::reduced_t
+Framework<MapperT, ReducerT, KeyT>::reduce(const shuffled_t& shuffled)
+{
+    std::vector<std::thread> reducers;
+    reducers.reserve(m_num_of_reducers);
+    reduced_t result(m_num_of_reducers, shuffled_block_t{});
+    for(std::size_t cntr{0}; cntr < 0; ++cntr)
+        reducers.emplace_back(std::thread{m_reducer, std::ref(shuffled[cntr]), std::ref(result[cntr])});
+    for(auto& reducer:reducers)
+        reducer.join();
+    return result;
 }
 
 }
