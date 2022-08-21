@@ -17,6 +17,15 @@
 // Вы можете поступать по-своему (не как я описываю), задание творческое!
 // Можете делать так, как написано, если считаете, что это хорошо.
 
+using key_t = std::string;
+using pair_t = std::pair<key_t, std::size_t>;
+using block_of_pairs_t = std::list<pair_t>;
+using pairs_t = std::vector<block_of_pairs_t>;
+
+void mapper_(const std::filesystem::path& fpath, const mapreduce::Block& block, block_of_pairs_t& out)
+{
+    ;
+}
 
 int main() {
     std::filesystem::path input("emails.txt");
@@ -24,19 +33,8 @@ int main() {
     constexpr std::size_t num_of_mappers = 3;
     constexpr std::size_t num_of_reducers = 2;
 
-    struct Block
-    {
-        std::size_t m_start{0};
-        std::size_t m_end{0};
-    };
 
-    using key_t = std::string;
-    using pair_t = std::pair<key_t, std::size_t>;
-    using block_of_pairs_t = std::list<pair_t>;
-    using pairs_t = std::vector<block_of_pairs_t>;
-
-    //auto mapper = [](const std::filesystem::path& fpath, const Block& block, block_of_pairs_t& out)
-    auto mapper = [](const std::filesystem::path& fpath, std::size_t start, std::size_t end, block_of_pairs_t& out)
+    auto mapper = [](const std::filesystem::path& fpath, const mapreduce::Block& block, block_of_pairs_t& out)
     {
         ;
     };
@@ -48,6 +46,18 @@ int main() {
 
     mapreduce::Framework<decltype(mapper), decltype(reducer), key_t>
             mr{mapper, num_of_mappers, reducer, num_of_reducers};
+    auto mapper2 = [](const std::filesystem::path& fpath, const mapreduce::Block& block,
+            block_of_pairs_t& out){};
+    mr.set(mapper2);
+
+    {
+//        mapreduce::Framework<decltype(&mapper_), decltype(reducer), key_t>
+//                mr2{mapper_, num_of_mappers, reducer, num_of_reducers};
+//        mr2.set(mapper);
+//        auto mapper2 = [&input](const std::filesystem::path& fpath, const mapreduce::Block& block,
+//                block_of_pairs_t& out){};
+//        mr2.set(mapper2);
+    }
 
     //цикл по длине префикса
     {

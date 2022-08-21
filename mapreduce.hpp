@@ -12,6 +12,12 @@
 namespace mapreduce
 {
 
+struct Block
+{
+    std::size_t m_start{0};
+    std::size_t m_end{0};
+};
+
 // Это MapReduce фреймворк. Он универсальный и ничего не знает о задаче, которую решает.
 // Здесь не должно быть кода, завязанного на конкретную задачу.
 //
@@ -39,13 +45,10 @@ public:
 
     void run(const std::filesystem::path& input, const std::filesystem::path& output);
 
-private:
-    struct Block
-    {
-        std::size_t m_start{0};
-        std::size_t m_end{0};
-    };
+    void set(const MapperT& mapper);
+    void set(const ReducerT& reducer);
 
+private:
     using input_blocks_t = std::vector<Block>;
     input_blocks_t split_input(const std::filesystem::path& file_path);
 
@@ -64,8 +67,10 @@ private:
     std::size_t m_num_of_mappers{0};
     std::size_t m_num_of_reducers{0};
 
-    MapperT m_mapper;
-    ReducerT m_reducer;
+//    MapperT  m_mapper;
+//    ReducerT m_reducer;
+    std::function<void(const std::filesystem::path&, const mapreduce::Block&, block_of_pairs_t&)>  m_mapper;
+    std::function<> m_reducer;
 };
 
 template<typename MapperT, typename ReducerT, typename KeyT>
@@ -123,6 +128,18 @@ void Framework<MapperT, ReducerT, KeyT>::run(const std::filesystem::path& input,
     // write into output
 }
 
+template<typename MapperT, typename ReducerT, typename KeyT>
+void Framework<MapperT, ReducerT, KeyT>::set(const MapperT& mapper)
+{
+    m_mapper = mapper;
+}
+
+template<typename MapperT, typename ReducerT, typename KeyT>
+void Framework<MapperT, ReducerT, KeyT>::set(const ReducerT& reducer)
+{
+    m_reducer = reducer;
+}
+
 // Эта функция не читает весь файл.
 // Определяем размер файла в байтах.
 // Делим размер на количество блоков - получаем границы блоков.
@@ -162,9 +179,9 @@ Framework<MapperT, ReducerT, KeyT>::map(const std::filesystem::path& fpath,
     for(std::size_t cntr{0}; cntr < m_num_of_mappers; ++cntr)
         mappers.emplace_back(std::thread{m_mapper,
                                          std::ref(fpath),
-                                         //std::ref(blocks[cntr]),
-                                         blocks[cntr].m_start,
-                                         blocks[cntr].m_end,
+                                         std::ref(blocks[cntr]),
+                                         //blocks[cntr].m_start,
+                                         //blocks[cntr].m_end,
                                          std::ref(result[cntr])});
     for(auto& reducer:mappers)
         reducer.join();
