@@ -88,8 +88,10 @@ Framework::pairs_t Framework::shuffle(pairs_t& mapped)
 {
     auto cmp = [](const auto& l, const auto& r)
     {
-        return (std::hash<decltype(l.first)>{}(l.first) <
-                std::hash<decltype(r.first)>{}(r.first));
+        return std::lexicographical_compare(std::begin(l.first), std::end(l.first),
+                                            std::begin(r.first), std::end(r.first));
+        //return (std::hash<decltype(l.first)>{}(l.first) <
+        //        std::hash<decltype(r.first)>{}(r.first));
     };
 
     // sort
@@ -117,7 +119,7 @@ Framework::pairs_t Framework::shuffle(pairs_t& mapped)
         auto find = [&shuffled, &cmp](const pair_t& pair)
         {
             const auto& key{pair.first};
-            static auto cur = std::begin(shuffled);
+            static auto cur{std::begin(shuffled)};
             for(auto bit{std::begin(shuffled)}; bit != std::end(shuffled); ++bit)
             {
                 for(auto it{std::begin(*bit)}; it != std::end(*bit); ++it)
@@ -131,21 +133,24 @@ Framework::pairs_t Framework::shuffle(pairs_t& mapped)
 
             if(cur == std::end(shuffled))
                 cur = std::begin(shuffled);
-            auto ret = std::make_pair(cur, std::upper_bound(std::begin(*cur), std::end(*cur), pair, cmp));
+            auto ret{std::make_pair(cur, std::upper_bound(std::begin(*cur), std::end(*cur), pair, cmp))};
             ++cur;
             return ret;
         };
 
-        for(auto& block:mapped)
+        for(auto& mapped_block:mapped)
         {
-            for(auto first{std::begin(block)}; first != std::end(block);)
+            while(!mapped_block.empty())
             {
-                auto pair = find(*first);
-                auto& into_block = *pair.first;
-                auto& where = pair.second;
-                auto last = std::upper_bound(first, std::end(block), *first, cmp);
-                into_block.splice(where, block, first, last);
-                first = std::begin(block);
+                auto first{std::begin(mapped_block)};
+                auto pair{find(*first)};
+                auto& shuffled_block{*pair.first};
+                auto& where{pair.second};
+                // last points to the first element in the mapped_block such that first->first < element.first
+                // or to the mapped_block.end
+                auto last{std::upper_bound(first, std::end(mapped_block), *first, cmp)};
+                // transfer elements [first,last) of mapped_block into shuffled_block
+                shuffled_block.splice(where, mapped_block, first, last);
             }
         }
         return shuffled;
@@ -164,20 +169,29 @@ Framework::pairs_t Framework::reduce(const pairs_t& shuffled)
     for(auto& reducer:reducers)
         reducer.join();
 
-    // merge
-    // TODO: merged container must be sorted
-    auto block{std::begin(im_result)};
-    for(auto it{std::next(block)}; it != std::end(im_result); ++it)
+    // merge. Merged container must be sorted
+    auto merged_block{std::begin(im_result)};
+    for(auto reduced_block{std::next(merged_block)}; reduced_block != std::end(im_result); ++reduced_block)
     {
-        for(auto it2{std::begin(*it)}; it2 != std::end(*it); ++it2)
+        while(!reduced_block->empty())
         {
-            const auto& pair = *it2;
-            auto el = std::upper_bound(std::begin(*block), std::end(*block), pair, cmp);
-            block->splice(el, *block, *it);
+            auto first{std::begin(*reduced_block)};
+            auto cmp = [](const auto& l, const auto& r)
+            {
+                return std::lexicographical_compare(std::begin(l.first), std::end(l.first),
+                                                    std::begin(r.first), std::end(r.first));
+                //return (std::hash<decltype(l.first)>{}(l.first) <
+                //        std::hash<decltype(r.first)>{}(r.first));
+            };
+            // last points to the first element in the mapped_block such that first->first < element.first
+            // or to the mapped_block.end
+            auto last{std::upper_bound(std::begin(*merged_block), std::end(*merged_block), *first, cmp)};
+            // transfer elements [first,last) of reduced_block into merged_block
+            merged_block->splice(last, *reduced_block, first, last);
         }
     }
 
     pairs_t result(1, block_of_pairs_t{});
-    m_reducer(*block, *result.begin());
+    m_reducer(*merged_block, *result.begin());
     return result;
 }
