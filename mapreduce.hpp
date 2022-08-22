@@ -67,10 +67,10 @@ private:
     std::size_t m_num_of_mappers{0};
     std::size_t m_num_of_reducers{0};
 
-//    MapperT  m_mapper;
-//    ReducerT m_reducer;
-    std::function<void(const std::filesystem::path&, const mapreduce::Block&, block_of_pairs_t&)>  m_mapper;
-    std::function<> m_reducer;
+    MapperT  m_mapper;
+    ReducerT m_reducer;
+//    std::function<void(const std::filesystem::path&, const mapreduce::Block&, block_of_pairs_t&)>  m_mapper;
+//    std::function<> m_reducer;
 };
 
 template<typename MapperT, typename ReducerT, typename KeyT>
@@ -180,11 +180,9 @@ Framework<MapperT, ReducerT, KeyT>::map(const std::filesystem::path& fpath,
         mappers.emplace_back(std::thread{m_mapper,
                                          std::ref(fpath),
                                          std::ref(blocks[cntr]),
-                                         //blocks[cntr].m_start,
-                                         //blocks[cntr].m_end,
                                          std::ref(result[cntr])});
-    for(auto& reducer:mappers)
-        reducer.join();
+    for(auto& mapper:mappers)
+        mapper.join();
     return result;
 }
 
@@ -193,13 +191,24 @@ typename Framework<MapperT, ReducerT, KeyT>::pairs_t
 Framework<MapperT, ReducerT, KeyT>::shuffle(pairs_t& mapped)
 {
     // sort
-    auto cmp = [](const auto& l, const auto& r)
+    auto sort = [](block_of_pairs_t& block)
     {
-        return (std::hash<decltype(l.first)>{}(l.first) <
-                std::hash<decltype(r.first)>{}(r.first));
-    };
-    for(auto& block:mapped)
+        auto cmp = [](const auto& l, const auto& r)
+        {
+            return (std::hash<decltype(l.first)>{}(l.first) <
+                    std::hash<decltype(r.first)>{}(r.first));
+        };
         block.sort(cmp);
+    };
+
+    std::vector<std::thread> sorters;
+    sorters.reserve(m_num_of_mappers);
+    for(std::size_t cntr{0}; cntr < m_num_of_mappers; ++cntr)
+        sorters.emplace_back(std::thread{sort, std::ref(mapped[cntr])});
+    for(auto& sorter:sorters)
+        sorter.join();
+
+
 
     // shuffle
     pairs_t shuffled;

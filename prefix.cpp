@@ -48,7 +48,7 @@ int main() {
             mr{mapper, num_of_mappers, reducer, num_of_reducers};
     auto mapper2 = [](const std::filesystem::path& fpath, const mapreduce::Block& block,
             block_of_pairs_t& out){};
-    mr.set(mapper2);
+//    mr.set(mapper2);
 
     {
 //        mapreduce::Framework<decltype(&mapper_), decltype(reducer), key_t>
