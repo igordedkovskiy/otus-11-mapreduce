@@ -9,6 +9,8 @@
 #include <functional>
 #include <thread>
 
+template<typename T> struct TD;
+
 namespace mapreduce
 {
 
@@ -191,51 +193,72 @@ typename Framework<MapperT, ReducerT, KeyT>::pairs_t
 Framework<MapperT, ReducerT, KeyT>::shuffle(pairs_t& mapped)
 {
     // sort
-    auto sort = [](block_of_pairs_t& block)
     {
-        auto cmp = [](const auto& l, const auto& r)
+        auto sort = [](block_of_pairs_t& block)
         {
-            return (std::hash<decltype(l.first)>{}(l.first) <
-                    std::hash<decltype(r.first)>{}(r.first));
+            auto cmp = [](const auto& l, const auto& r)
+            {
+                return (std::hash<decltype(l.first)>{}(l.first) <
+                        std::hash<decltype(r.first)>{}(r.first));
+            };
+            block.sort(cmp);
         };
-        block.sort(cmp);
-    };
-
-    std::vector<std::thread> sorters;
-    sorters.reserve(m_num_of_mappers);
-    for(std::size_t cntr{0}; cntr < m_num_of_mappers; ++cntr)
-        sorters.emplace_back(std::thread{sort, std::ref(mapped[cntr])});
-    for(auto& sorter:sorters)
-        sorter.join();
-
+        std::vector<std::thread> sorters;
+        sorters.reserve(m_num_of_mappers);
+        for(std::size_t cntr{0}; cntr < m_num_of_mappers; ++cntr)
+            sorters.emplace_back(std::thread{sort, std::ref(mapped[cntr])});
+        for(auto& sorter:sorters)
+            sorter.join();
+    }
 
 
     // shuffle
-    pairs_t shuffled;
-    shuffled.reserve(m_num_of_reducers);
-    std::size_t num_of_pairs{0};
-    for(const auto& block:mapped)
-        num_of_pairs += block.size();
-    const auto num_of_pairs_in_block{(num_of_pairs % m_num_of_reducers ?
-                                      num_of_pairs / m_num_of_reducers :
-                                      num_of_pairs / m_num_of_reducers + 1)};
-    auto cur = std::begin(*std::begin(mapped))->first;
-    shuffled.emplace_back(typename decltype(shuffled)::value_type(1, std::move(*std::begin(*std::begin(mapped)))));
-    for(auto& block:mapped)
     {
-        for(auto it{std::begin(block)}; it != std::end(block);)
+        pairs_t shuffled;
+        shuffled.reserve(m_num_of_reducers);
+        auto cur{std::begin(*std::begin(mapped))->first};
+        shuffled.emplace_back(typename decltype(shuffled)::value_type(1, std::move(*std::begin(*std::begin(mapped)))));
+
+        auto find = [&shuffled](const KeyT& key)
         {
-            if(it->first == cur || shuffled.back().size() < num_of_pairs_in_block)
-                shuffled.back().emplace_back(std::move(*it));
-            else
+            static auto cur = std::begin(shuffled);
+            for(auto bit{std::begin(shuffled)}; bit != std::end(shuffled); ++bit)
             {
-                cur = it->first;
-                shuffled.emplace_back(typename decltype(shuffled)::value_type(1, std::move(*it)));
+                for(auto it{std::begin(*bit)}; it != std::end(*bit); ++it)
+                {
+                    if(it->first == key)
+                        return std::make_pair(bit, it);
+                }
             }
-            it = block.erase(it);
+            if(cur == std::end(shuffled))
+                cur = std::begin(shuffled);
+            auto ret = std::make_pair(cur, std::begin(*cur));
+            ++cur;
+            return ret;
+        };
+
+        for(auto& block:mapped)
+        {
+            for(auto first{std::begin(block)}; first != std::end(block);)
+            {
+                auto pair = find(first->first);
+                auto& into_block = *pair.first;
+                auto& where = pair.second;
+                auto find_last = [&block, &first]()
+                {
+                    const auto key{first->first};
+                    for(auto it{first}; it != std::end(block); ++it)
+                    {
+                        if(it->first != key)
+                            return it;
+                    }
+                    return std::end(block);
+                };
+                into_block.splice(where, block, first, find_last());
+            }
         }
+        return shuffled;
     }
-    return shuffled;
 }
 
 template<typename MapperT, typename ReducerT, typename KeyT>
