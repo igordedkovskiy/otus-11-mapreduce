@@ -145,6 +145,7 @@ Framework::pairs_t Framework::shuffle(pairs_t& mapped)
                 auto& where = pair.second;
                 auto last = std::upper_bound(first, std::end(block), *first, cmp);
                 into_block.splice(where, block, first, last);
+                first = std::begin(block);
             }
         }
         return shuffled;
@@ -168,10 +169,11 @@ Framework::pairs_t Framework::reduce(const pairs_t& shuffled)
     auto block{std::begin(im_result)};
     for(auto it{std::next(block)}; it != std::end(im_result); ++it)
     {
-        for(auto it{std::next(block)}; it != std::end(im_result); ++it)
+        for(auto it2{std::begin(*it)}; it2 != std::end(*it); ++it2)
         {
-            auto el = std::upper_bound(std::begin(*cur), std::end(*cur), pair, cmp);
-            block->splice(el, *it);
+            const auto& pair = *it2;
+            auto el = std::upper_bound(std::begin(*block), std::end(*block), pair, cmp);
+            block->splice(el, *block, *it);
         }
     }
 
