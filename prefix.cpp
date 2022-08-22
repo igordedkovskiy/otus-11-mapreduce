@@ -17,10 +17,10 @@
 // Вы можете поступать по-своему (не как я описываю), задание творческое!
 // Можете делать так, как написано, если считаете, что это хорошо.
 
-using key_t = std::string;
-using pair_t = std::pair<key_t, std::size_t>;
-using block_of_pairs_t = std::list<pair_t>;
-using pairs_t = std::vector<block_of_pairs_t>;
+using key_t = mapreduce::Framework::KeyT;
+using pair_t = mapreduce::Framework::pair_t;
+using block_of_pairs_t = mapreduce::Framework::block_of_pairs_t;
+using pairs_t = mapreduce::Framework::pairs_t;
 
 void mapper_(const std::filesystem::path& fpath, const mapreduce::Block& block, block_of_pairs_t& out)
 {
@@ -44,11 +44,9 @@ int main() {
         ;
     };
 
-    mapreduce::Framework<decltype(mapper), decltype(reducer), key_t>
-            mr{mapper, num_of_mappers, reducer, num_of_reducers};
-    auto mapper2 = [](const std::filesystem::path& fpath, const mapreduce::Block& block,
-            block_of_pairs_t& out){};
-//    mr.set(mapper2);
+    mapreduce::Framework mr{mapper, num_of_mappers, reducer, num_of_reducers};
+    auto mapper2 = [](const std::filesystem::path& fpath, const mapreduce::Block& block, block_of_pairs_t& out){};
+    mr.set_mapper(mapper2);
 
     {
 //        mapreduce::Framework<decltype(&mapper_), decltype(reducer), key_t>
