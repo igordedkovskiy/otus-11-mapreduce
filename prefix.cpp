@@ -36,26 +36,37 @@ int main() {
 
     auto mapper = [](const std::filesystem::path& fpath, const mapreduce::Block& block, block_of_pairs_t& out)
     {
-        ;
+        auto common_prefix = [](std::string& s1, std::string& s2)
+        {
+            for(std::size_t cntr{0}; cntr < s1.size() && cntr < s2.size(); ++cntr)
+            {
+                if(s1[cntr] != s2[cntr])
+                    return s1.substr(cntr - 1);
+            }
+            return s1.size() <= s2.size() ? s1 : s2;
+        };
+
+        std::string s1, s2;
+        std::getline(s1);
+        std::string longest_common_prefix;
+        while()
+        {
+            std::getline(s2);
+            auto prefix = common_prefix(s1, s2);
+            if(prefix.size() > longest_common_prefix.size())
+                longest_common_prefix = std::move(prefix);
+            s1 = std::move(s2);
+        }
+        out.emplace_back(std::make_pair(std::move(longest_common_prefix), longest_common_prefix.size()));
     };
 
     auto reducer = [](const block_of_pairs_t& in, block_of_pairs_t& out)
     {
-        ;
+        auto cmp = [](const pair_t& l, const pair_t& r){ return l.second < r.second; };
+        out.emplace_back(*std::minmax_element(std::begin(in), std::end(in), cmp));
     };
 
     mapreduce::Framework mr{mapper, num_of_mappers, reducer, num_of_reducers};
-    auto mapper2 = [](const std::filesystem::path& fpath, const mapreduce::Block& block, block_of_pairs_t& out){};
-    mr.set_mapper(mapper2);
-
-    {
-//        mapreduce::Framework<decltype(&mapper_), decltype(reducer), key_t>
-//                mr2{mapper_, num_of_mappers, reducer, num_of_reducers};
-//        mr2.set(mapper);
-//        auto mapper2 = [&input](const std::filesystem::path& fpath, const mapreduce::Block& block,
-//                block_of_pairs_t& out){};
-//        mr2.set(mapper2);
-    }
 
     //цикл по длине префикса
     {

@@ -155,12 +155,27 @@ Framework::pairs_t Framework::reduce(const pairs_t& shuffled)
 {
     std::vector<std::thread> reducers;
     reducers.reserve(m_num_of_reducers);
-    pairs_t result(m_num_of_reducers, block_of_pairs_t{});
+    pairs_t im_result(m_num_of_reducers, block_of_pairs_t{});
     for(std::size_t cntr{0}; cntr < m_num_of_reducers; ++cntr)
         reducers.emplace_back(std::thread{m_reducer,
                                           std::ref(shuffled[cntr]),
-                                          std::ref(result[cntr])});
+                                          std::ref(im_result[cntr])});
     for(auto& reducer:reducers)
         reducer.join();
+
+    // merge
+    // TODO: merged container must be sorted
+    auto block{std::begin(im_result)};
+    for(auto it{std::next(block)}; it != std::end(im_result); ++it)
+    {
+        for(auto it{std::next(block)}; it != std::end(im_result); ++it)
+        {
+            auto el = std::upper_bound(std::begin(*cur), std::end(*cur), pair, cmp);
+            block->splice(el, *it);
+        }
+    }
+
+    pairs_t result(1, block_of_pairs_t{});
+    m_reducer(*block, *result.begin());
     return result;
 }
