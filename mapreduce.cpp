@@ -179,6 +179,27 @@ Framework::pairs_t Framework::reduce(const blocks_of_pairs_t& shuffled)
 
     // merge. Merged container must be sorted
     auto merged_block{std::begin(im_result)};
+
+    auto find = [&merged_block, &cmp](const pair_t& pair)
+    {
+        const auto& key{pair.first};
+        for(auto it{std::begin(merged_block)}; it != std::end(merged_block); ++it)
+        {
+            if(it->first == key)
+                return it;
+            if(it->first > key)
+                break;
+        }
+
+        auto where_to_copy{std::begin(shuffled)};
+        for(auto block{std::begin(shuffled)}; block != std::end(shuffled); ++block)
+        {
+            if(block->size() < where_to_copy->size())
+                where_to_copy = block;
+        }
+        return std::upper_bound(std::begin(*where_to_copy), std::end(*where_to_copy), pair, cmp);
+    };
+
     for(auto reduced_block{std::next(merged_block)}; reduced_block != std::end(im_result); ++reduced_block)
     {
         while(!reduced_block->empty())
@@ -191,9 +212,10 @@ Framework::pairs_t Framework::reduce(const blocks_of_pairs_t& shuffled)
             };
             // last points to the first element in the mapped_block such that first->first < element.first
             // or to the mapped_block.end
-            auto last{std::upper_bound(std::begin(*merged_block), std::end(*merged_block), *first, cmp)};
+            auto last_into{std::upper_bound(std::begin(*merged_block), std::end(*merged_block), *first, cmp)};
+            auto last_from{std::upper_bound(std::begin(*merged_block), std::end(*merged_block), *first, cmp)};
             // transfer elements [first,last) of reduced_block into merged_block
-            merged_block->splice(last, *reduced_block, first, last);
+            merged_block->splice(last_into, *reduced_block, first, last_into);
         }
     }
 
