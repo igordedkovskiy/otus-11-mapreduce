@@ -118,10 +118,10 @@ Framework::blocks_of_pairs_t Framework::shuffle(blocks_of_pairs_t& mapped)
 
     // shuffle. Keep sorted
     {
-        blocks_of_pairs_t shuffled;
-        shuffled.reserve(m_num_of_reducers);
-        auto cur{std::begin(*std::begin(mapped))->first};
-        shuffled.emplace_back(typename decltype(shuffled)::value_type(1, std::move(*std::begin(*std::begin(mapped)))));
+        blocks_of_pairs_t shuffled{m_num_of_reducers, blocks_of_pairs_t::value_type{}};
+        //shuffled.reserve(m_num_of_reducers);
+        //auto cur{std::begin(*std::begin(mapped))->first};
+        //shuffled.emplace_back(typename decltype(shuffled)::value_type(1, std::move(*std::begin(*std::begin(mapped)))));
 
         auto find = [&shuffled, &cmp](const pair_t& pair)
         {
