@@ -4,7 +4,6 @@
 
 #include "mapreduce.hpp"
 
-//using mapreduce::Framework::KeyT;
 using pair_t = mapreduce::Framework::pair_t;
 using pairs_t = mapreduce::Framework::pairs_t;
 using blocks_of_pairs_t = mapreduce::Framework::blocks_of_pairs_t;
