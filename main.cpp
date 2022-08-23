@@ -33,7 +33,6 @@ int main()
     constexpr std::size_t num_of_mappers = 3;
     constexpr std::size_t num_of_reducers = 2;
 
-    // TODO: read a chunk of file bounded with block
     auto mapper = [](const std::filesystem::path& fpath, const mapreduce::Block& block, pairs_t& out)
     {
         auto common_prefix = [](const std::string& s1, const std::string& s2)

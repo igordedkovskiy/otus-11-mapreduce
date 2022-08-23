@@ -44,7 +44,7 @@ void mapreduce::Framework::run(const std::filesystem::path& input, const std::fi
     // write into output
     std::fstream file {output.string(), std::ios::out};
     for(const auto& el:result)
-        file << '[' << el.first << ',' << el.second << "]\n";
+        file << el.first << ';' << el.second << '\n';
 }
 
 // Эта функция не читает весь файл.
