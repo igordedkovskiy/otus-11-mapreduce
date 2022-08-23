@@ -14,6 +14,23 @@ find_package(Boost COMPONENTS system REQUIRED)
 
 find_package(Threads REQUIRED)
 
+
+#add_library(sais_lib
+#    "gsais.hpp"
+#    "gsais.cpp"
+#)
+#set_target_properties(sais_lib PROPERTIES
+#    CXX_STANDARD 20
+#    CXX_STANDARD_REQUIRED ON
+#)
+#target_include_directories(sais_lib PRIVATE
+#    #${SQLite3_INCLUDE_DIRS}
+#)
+#target_link_libraries(sais_lib PRIVATE
+#    ${CMAKE_THREAD_LIBS_INIT}
+#)
+
+
 add_library(framework_lib
     "mapreduce.hpp"
     "mapreduce.cpp"

@@ -73,11 +73,10 @@ private:
 
     pairs_t reduce(const blocks_of_pairs_t& shuffled);
 
-    std::size_t m_num_of_mappers{0};
-    std::size_t m_num_of_reducers{0};
-
     std::function<MapperT>  m_mapper;
+    std::size_t m_num_of_mappers{0};
     std::function<ReducerT> m_reducer;
+    std::size_t m_num_of_reducers{0};
 };
 
 template<typename M, typename R>

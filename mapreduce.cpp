@@ -1,3 +1,4 @@
+#include <iostream>
 #include <algorithm>
 #include "mapreduce.hpp"
 
@@ -34,13 +35,16 @@ using namespace mapreduce;
 // Но это то, к чему нужно стремиться
 // Проектирование ПО часто требует идти на компромиссы
 // Это как оптимизация функции многих переменных с доп. ограничениями
-void mapreduce::Framework::run(const std::filesystem::__cxx11::path &input, const std::filesystem::__cxx11::path &output)
+void mapreduce::Framework::run(const std::filesystem::path& input, const std::filesystem::path& output)
 {
     auto blocks {split_input(input)};
-    auto mapped{map(input, blocks)};
-    auto shuffled{shuffle(mapped)};
-    auto result{reduce(shuffled)};
+    auto mapped {map(input, blocks)};
+    auto shuffled {shuffle(mapped)};
+    auto result {reduce(shuffled)};
     // write into output
+    std::fstream file {output.string(), std::ios::out};
+    for(const auto& el:result)
+        file << '[' << el.first << ',' << el.second << "]\n";
 }
 
 // Эта функция не читает весь файл.
@@ -50,18 +54,33 @@ void mapreduce::Framework::run(const std::filesystem::__cxx11::path &input, cons
 // Выравниваем границы блоков по границам строк.
 Framework::input_blocks_t Framework::split_input(const std::filesystem::path& file_path)
 {
+//    try
+//    {
+//        auto s = std::filesystem::file_size(file_path);
+//        ++s;
+//    }
+//    catch(std::filesystem::filesystem_error& e)
+//    {
+//        std::cout << e.what() << std::endl;
+//    }
+//    std::cout << file_path << std::endl;
     const auto fsize{std::filesystem::file_size(file_path)};
     const auto block_size{(fsize % m_num_of_mappers ?
                            fsize / m_num_of_mappers :
                            fsize / m_num_of_mappers + 1)};
     input_blocks_t blocks;
     blocks.reserve(m_num_of_mappers);
-    std::fstream file{file_path.filename(), std::ios::in};
+    std::fstream file{file_path.string(), std::ios::in};
     std::string line;
     for(std::size_t start{0}; start < fsize;)
     {
+        if(start + block_size >= fsize)
+        {
+            blocks.emplace_back(Block{start, fsize - 1});
+            break;
+        }
         file.seekg(start + block_size);
-        std::getline(file, line);
+        std::getline(file, line, '\n');
         const std::size_t end = file.tellg();
         blocks.emplace_back(Block{start, end});
         start = end + 1;
