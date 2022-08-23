@@ -69,11 +69,11 @@ Framework::input_blocks_t Framework::split_input(const std::filesystem::path& fi
     return blocks;
 }
 
-Framework::pairs_t Framework::map(const std::filesystem::path& fpath, const input_blocks_t& blocks)
+Framework::blocks_of_pairs_t Framework::map(const std::filesystem::path& fpath, const input_blocks_t& blocks)
 {
     std::vector<std::thread> mappers;
     mappers.reserve(m_num_of_mappers);
-    pairs_t result(m_num_of_mappers, block_of_pairs_t{});
+    blocks_of_pairs_t result(m_num_of_mappers, pairs_t{});
     for(std::size_t cntr{0}; cntr < m_num_of_mappers; ++cntr)
         mappers.emplace_back(std::thread{m_mapper,
                                          std::ref(fpath),
@@ -84,19 +84,17 @@ Framework::pairs_t Framework::map(const std::filesystem::path& fpath, const inpu
     return result;
 }
 
-Framework::pairs_t Framework::shuffle(pairs_t& mapped)
+Framework::blocks_of_pairs_t Framework::shuffle(blocks_of_pairs_t& mapped)
 {
     auto cmp = [](const auto& l, const auto& r)
     {
         return std::lexicographical_compare(std::begin(l.first), std::end(l.first),
                                             std::begin(r.first), std::end(r.first));
-        //return (std::hash<decltype(l.first)>{}(l.first) <
-        //        std::hash<decltype(r.first)>{}(r.first));
     };
 
     // sort
     {
-        auto sort = [&cmp](block_of_pairs_t& block)
+        auto sort = [&cmp](pairs_t& block)
         {
             block.sort(cmp);
         };
@@ -109,9 +107,9 @@ Framework::pairs_t Framework::shuffle(pairs_t& mapped)
     }
 
 
-    // shuffle
+    // shuffle. Keep sorted
     {
-        pairs_t shuffled;
+        blocks_of_pairs_t shuffled;
         shuffled.reserve(m_num_of_reducers);
         auto cur{std::begin(*std::begin(mapped))->first};
         shuffled.emplace_back(typename decltype(shuffled)::value_type(1, std::move(*std::begin(*std::begin(mapped)))));
@@ -119,7 +117,6 @@ Framework::pairs_t Framework::shuffle(pairs_t& mapped)
         auto find = [&shuffled, &cmp](const pair_t& pair)
         {
             const auto& key{pair.first};
-            static auto cur{std::begin(shuffled)};
             for(auto bit{std::begin(shuffled)}; bit != std::end(shuffled); ++bit)
             {
                 for(auto it{std::begin(*bit)}; it != std::end(*bit); ++it)
@@ -131,11 +128,13 @@ Framework::pairs_t Framework::shuffle(pairs_t& mapped)
                 }
             }
 
-            if(cur == std::end(shuffled))
-                cur = std::begin(shuffled);
-            auto ret{std::make_pair(cur, std::upper_bound(std::begin(*cur), std::end(*cur), pair, cmp))};
-            ++cur;
-            return ret;
+            auto where_to_copy{std::begin(shuffled)};
+            for(auto block{std::begin(shuffled)}; block != std::end(shuffled); ++block)
+            {
+                if(block->size() < where_to_copy->size())
+                    where_to_copy = block;
+            }
+            return std::make_pair(where_to_copy, std::upper_bound(std::begin(*where_to_copy), std::end(*where_to_copy), pair, cmp));
         };
 
         for(auto& mapped_block:mapped)
@@ -157,11 +156,11 @@ Framework::pairs_t Framework::shuffle(pairs_t& mapped)
     }
 }
 
-Framework::pairs_t Framework::reduce(const pairs_t& shuffled)
+Framework::pairs_t Framework::reduce(const blocks_of_pairs_t& shuffled)
 {
     std::vector<std::thread> reducers;
     reducers.reserve(m_num_of_reducers);
-    pairs_t im_result(m_num_of_reducers, block_of_pairs_t{});
+    blocks_of_pairs_t im_result(m_num_of_reducers, pairs_t{});
     for(std::size_t cntr{0}; cntr < m_num_of_reducers; ++cntr)
         reducers.emplace_back(std::thread{m_reducer,
                                           std::ref(shuffled[cntr]),
@@ -180,8 +179,6 @@ Framework::pairs_t Framework::reduce(const pairs_t& shuffled)
             {
                 return std::lexicographical_compare(std::begin(l.first), std::end(l.first),
                                                     std::begin(r.first), std::end(r.first));
-                //return (std::hash<decltype(l.first)>{}(l.first) <
-                //        std::hash<decltype(r.first)>{}(r.first));
             };
             // last points to the first element in the mapped_block such that first->first < element.first
             // or to the mapped_block.end
@@ -191,7 +188,7 @@ Framework::pairs_t Framework::reduce(const pairs_t& shuffled)
         }
     }
 
-    pairs_t result(1, block_of_pairs_t{});
-    m_reducer(*merged_block, *result.begin());
+    pairs_t result{};
+    m_reducer(*merged_block, result);
     return result;
 }

@@ -45,11 +45,11 @@ class Framework
 public:
     using KeyT = std::string;//std::size_t;
     using pair_t = std::pair<KeyT, std::size_t>;
-    using block_of_pairs_t = std::list<pair_t>;
-    using pairs_t = std::vector<block_of_pairs_t>;
+    using pairs_t = std::list<pair_t>;
+    using blocks_of_pairs_t = std::vector<pairs_t>;
 
-    using MapperT = void(const std::filesystem::path&, const mapreduce::Block&, block_of_pairs_t&);
-    using ReducerT = void(const block_of_pairs_t&, block_of_pairs_t&);
+    using MapperT = void(const std::filesystem::path&, const mapreduce::Block&, pairs_t&);
+    using ReducerT = void(const pairs_t&, pairs_t&);
 
 public:
     template<typename M, typename R>
@@ -66,12 +66,12 @@ private:
     input_blocks_t split_input(const std::filesystem::path& file_path);
 
     /// \returns num_of_mappers vectors of pairs
-    pairs_t map(const std::filesystem::path& fpath, const input_blocks_t& blocks);
+    blocks_of_pairs_t map(const std::filesystem::path& fpath, const input_blocks_t& blocks);
 
     /// \returns num_of_reducers vectors of pairs
-    pairs_t shuffle(pairs_t& mapped);
+    blocks_of_pairs_t shuffle(blocks_of_pairs_t& mapped);
 
-    pairs_t reduce(const pairs_t& shuffled);
+    pairs_t reduce(const blocks_of_pairs_t& shuffled);
 
     std::size_t m_num_of_mappers{0};
     std::size_t m_num_of_reducers{0};
