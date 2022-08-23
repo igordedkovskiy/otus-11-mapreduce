@@ -54,16 +54,6 @@ void mapreduce::Framework::run(const std::filesystem::path& input, const std::fi
 // Выравниваем границы блоков по границам строк.
 Framework::input_blocks_t Framework::split_input(const std::filesystem::path& file_path)
 {
-//    try
-//    {
-//        auto s = std::filesystem::file_size(file_path);
-//        ++s;
-//    }
-//    catch(std::filesystem::filesystem_error& e)
-//    {
-//        std::cout << e.what() << std::endl;
-//    }
-//    std::cout << file_path << std::endl;
     const auto fsize{std::filesystem::file_size(file_path)};
     const auto block_size{(fsize % m_num_of_mappers ?
                            fsize / m_num_of_mappers :
