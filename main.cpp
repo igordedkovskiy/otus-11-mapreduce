@@ -69,7 +69,7 @@ int main()
     {
         auto cmp = [](const pair_t& l, const pair_t& r)
         {
-            return l.second > r.second;
+            return l.second < r.second;
         };
         out.emplace_back(*std::max_element(std::begin(in), std::end(in), cmp));
     };
