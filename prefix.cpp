@@ -10,8 +10,8 @@ using blocks_of_pairs_t = mapreduce::Framework::blocks_of_pairs_t;
 
 int main()
 {
-    std::filesystem::path input("../tests/input.txt");
-    std::filesystem::path output("../tests/out.txt");
+    std::filesystem::path input("../tests/input-prefix.txt");
+    std::filesystem::path output("../tests/out-prefix.txt");
     constexpr std::size_t num_of_mappers = 3;
     constexpr std::size_t num_of_reducers = 2;
 
