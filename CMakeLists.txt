@@ -46,17 +46,18 @@ target_link_libraries(framework_lib PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
-add_executable(prefix
+add_library(prefix_lib
+    "prefix.hpp"
     "prefix.cpp"
 )
-set_target_properties(prefix PROPERTIES
+set_target_properties(prefix_lib PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )
-target_include_directories(prefix PRIVATE
+target_include_directories(prefix_lib PRIVATE
     ${CMAKE_BINARY_DIR}
 )
-target_link_libraries(prefix PRIVATE
+target_link_libraries(prefix_lib PRIVATE
     framework_lib
     ${CMAKE_THREAD_LIBS_INIT}
 )
@@ -72,7 +73,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_BINARY_DIR}
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    framework_lib
+    prefix_lib
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -144,7 +145,7 @@ if(WITH_GTEST)
         ${GTEST_BOTH_LIBRARIES}
         gtest
         gtest_main
-        framework_lib
+        prefix_lib
         ${CMAKE_THREAD_LIBS_INIT}
     )
 endif()
