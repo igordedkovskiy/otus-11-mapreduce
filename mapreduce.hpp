@@ -3,11 +3,12 @@
 #include <cstdint>
 #include <vector>
 #include <list>
-#include <unordered_map>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <thread>
+#include <exception>
+#include <iostream>
 
 template<typename T> struct TD;
 
@@ -20,36 +21,24 @@ struct Block
     std::size_t m_end{0};
 };
 
-// Это MapReduce фреймворк. Он универсальный и ничего не знает о задаче, которую решает.
-// Здесь не должно быть кода, завязанного на конкретную задачу.
-//
-// С помощью этого фреймворка должны решаться разные задачи.
-// Когда напишете это, попробуйте решить с помощью этого фреймворка все задачи, которые мы разбирали
-// на лекции.
-//
-// Это наш самописный аналог hadoop mapreduce.
-// Он на самом деле не работает с по-настоящему большими данными, потому что выполняется на одной
-// машине. Но мы делаем вид, что данных много, и представляем, что наши потоки - это процессы на
-// разных узлах.
-//
-// Ни один из потоков не должен полностью загружать свои данные в память или пробегаться по всем
-// данным. Каждый из потоков обрабатывает только свой блок.
-//
-// На самом деле даже один блок данных не должен полностью грузиться в оперативку, а должен
-// обрабатываться построчно. Но в домашней работе можем этим пренебречь и загрузить один блок в
-// память одним потоком.
-
-//template<typename MapperT, typename ReducerT, typename KeyT>
 class Framework
 {
 public:
-    using KeyT = std::string;//std::size_t;
+    using KeyT = std::string;
     using pair_t = std::pair<KeyT, std::size_t>;
     using pairs_t = std::list<pair_t>;
     using blocks_of_pairs_t = std::vector<pairs_t>;
 
     using MapperT = void(const std::filesystem::path&, const mapreduce::Block&, pairs_t&);
     using ReducerT = void(const pairs_t&, pairs_t&);
+
+    struct exception: public std::exception
+    {
+        exception(const std::string& m);
+        exception(std::string&& m) noexcept;
+        const char* what() const noexcept;
+        std::string m_message;
+    };
 
 public:
     template<typename M, typename R>
@@ -82,13 +71,19 @@ private:
 template<typename M, typename R>
 Framework::Framework(const M& mapper, std::size_t num_of_mappers,
                      const R& reducer, std::size_t num_of_reducers):
-    //m_mapper{std::forward<decltype(mapper)>(mapper)},
     m_mapper{mapper},
     m_num_of_mappers{num_of_mappers},
-    //m_reducer{std::forward<decltype(reducer)>(reducer)},
     m_reducer{reducer},
     m_num_of_reducers{num_of_reducers}
-{}
+{
+    if(m_num_of_reducers > m_num_of_mappers)
+    {
+        m_num_of_reducers = m_num_of_mappers;
+        std::cerr << "Entered number of reducers is greater than number of mappers."
+                     "Therefore number of reducers is set equal to number of mappers" << std::endl;
+//        throw exception("Number of reducers is greater than number of mappers");
+    }
+}
 
 template<typename M> void Framework::set_mapper(const M& mapper)
 {

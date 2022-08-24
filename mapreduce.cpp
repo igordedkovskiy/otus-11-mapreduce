@@ -47,11 +47,6 @@ void mapreduce::Framework::run(const std::filesystem::path& input, const std::fi
         file << el.first << ';' << el.second << '\n';
 }
 
-// Эта функция не читает весь файл.
-// Определяем размер файла в байтах.
-// Делим размер на количество блоков - получаем границы блоков.
-// Читаем данные только вблизи границ.
-// Выравниваем границы блоков по границам строк.
 Framework::input_blocks_t Framework::split_input(const std::filesystem::path& file_path)
 {
     const auto fsize{std::filesystem::file_size(file_path)};
@@ -222,4 +217,17 @@ Framework::pairs_t Framework::reduce(const blocks_of_pairs_t& shuffled)
     pairs_t result{};
     m_reducer(*merged_block, result);
     return result;
+}
+
+Framework::exception::exception(const std::string& m):
+    m_message{m}
+{}
+
+Framework::exception::exception(std::string&& m) noexcept:
+    m_message{std::move(m)}
+{}
+
+const char * Framework::exception::what() const noexcept
+{
+    return m_message.c_str();
 }
