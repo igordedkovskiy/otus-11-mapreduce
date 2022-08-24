@@ -96,7 +96,7 @@ TEST(TEST_PREFIX, mr_word_count)
 
     {
         mapreduce_words_count::classical();
-        mapreduce::Framework mr{mapreduce_words_count::mapper, 5, mapreduce_words_count::reducer, 3};
+        mapreduce::Framework mr{mapreduce_words_count::mapper, 4, mapreduce_words_count::reducer, 3};
         mr.run(input, output);
         check();
     }

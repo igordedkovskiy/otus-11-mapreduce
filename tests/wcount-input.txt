@@ -1,7 +1,7 @@
 A MapReduce program is composed of a map procedure, which performs filtering
-and sorting (such as sorting students by first name into queues, one queue
-for each name), and a reduce method, which performs a summary operation (such
-as counting the number of students in each queue, yielding name frequencies).
+and sorting (such as sorting students by first name into queues, one queue for
+each name), and a reduce method, which performs a summary operation (such as
+counting the number of students in each queue, yielding name frequencies).
 The MapReduce System (also called infrastructure or framework) orchestrates
 the processing by marshalling the distributed servers, running the various
 tasks in parallel, managing all communications and data transfers between the

@@ -52,7 +52,7 @@ int main()
 
     std::filesystem::path input("../tests/wcount-input.txt");
     std::filesystem::path output("../tests/wcount-out.txt");
-    mapreduce::Framework mr{mapreduce_words_count::mapper, 1, mapreduce_words_count::reducer, 1};
+    mapreduce::Framework mr{mapreduce_words_count::mapper, 4, mapreduce_words_count::reducer, 2};
     mr.run(input, output);
     return 0;
 }

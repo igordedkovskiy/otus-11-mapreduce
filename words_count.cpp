@@ -1,3 +1,4 @@
+#include <cassert>
 #include "words_count.hpp"
 
 namespace mapreduce_words_count
@@ -8,16 +9,37 @@ void mapper(const std::filesystem::path &fpath, const mapreduce::Block &block, m
     std::fstream file{fpath.string(), std::ios::in};
     file.seekg(block.m_start);
 
+//    {
+//        std::fstream file{fpath.string(), std::ios::in};
+//        file.seekg(block.m_start);
+//        std::string s, res;
+//        do
+//        {
+//            file >> s;
+//            for(auto& c:s)
+//                c = std::tolower(c);
+//            std::string alpha;
+//            std::copy_if(s.begin(), s.end(), std::back_inserter(alpha), [](unsigned char c) {return std::isalpha(c) || std::isspace(c); });
+//            s.swap(alpha);
+//            res += " " + std::move(s);
+//        }
+//        while(block.m_end > static_cast<decltype(block.m_end)>(file.tellg()));
+//        std::cout << res << std::endl;
+//    }
+
     std::string s;
     do
     {
         file >> s;
 
+        assert(file.tellg() == file.tellg());
+
         for(auto& c:s)
             c = std::tolower(c);
 
         std::string alpha;
-        std::copy_if(s.begin(), s.end(), std::back_inserter(alpha), [](unsigned char c) {return std::isalpha(c) || std::isspace(c); });
+        std::copy_if(s.begin(), s.end(), std::back_inserter(alpha),
+                     [](unsigned char c) {return std::isalpha(c) || std::isspace(c); });
         s.swap(alpha);
 
         auto el = out.find(s);
@@ -26,7 +48,10 @@ void mapper(const std::filesystem::path &fpath, const mapreduce::Block &block, m
         else
             out.insert(std::make_pair(std::move(s), 1));
     }
-    while(block.m_end >= static_cast<decltype(block.m_end)>(file.tellg()));
+    while(block.m_end > file.tellg() && file.tellg() > 0);
+
+//    for(auto& [w, count]:out)
+//        std::cout << w << ' ' << count << std::endl << std::endl;
 }
 
 void reducer(const mapreduce::Framework::pairs_t &in, mapreduce::Framework::pairs_t &out)

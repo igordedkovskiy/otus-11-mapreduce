@@ -53,20 +53,16 @@ void mapreduce::Framework::run(const std::filesystem::path& input, const std::fi
 Framework::input_blocks_t Framework::split_input(const std::filesystem::path& file_path)
 {
     const auto fsize{std::filesystem::file_size(file_path)};
-    const auto block_size{(fsize % m_num_of_mappers ?
-                           fsize / m_num_of_mappers :
-                           fsize / m_num_of_mappers + 1)};
+//    const auto block_size{(fsize % m_num_of_mappers ?
+//                           fsize / m_num_of_mappers :
+//                           fsize / m_num_of_mappers + 1)};
+    const auto block_size {fsize / m_num_of_mappers};
     input_blocks_t blocks;
     blocks.reserve(m_num_of_mappers);
     std::fstream file{file_path.string(), std::ios::in};
     std::string line;
-    for(std::size_t start = file.tellg(); start < fsize; start = file.tellg())
+    for(std::size_t cntr{0}, start = file.tellg(); cntr < m_num_of_mappers; ++cntr, start = file.tellg())
     {
-        if(start + block_size >= fsize)
-        {
-            blocks.emplace_back(Block{start, fsize});
-            break;
-        }
         file.seekg(start + block_size);
         std::getline(file, line, '\n');
         if(file.tellg() < 0)
@@ -77,13 +73,35 @@ Framework::input_blocks_t Framework::split_input(const std::filesystem::path& fi
         else
             blocks.emplace_back(Block{start, static_cast<std::size_t>(file.tellg())});
     }
+    if(file.tellg())
+        blocks.back().m_end = fsize;
+
+//    for(std::size_t start = file.tellg(); start < fsize; start = file.tellg())
+////    for(std::size_t start = 0; start < fsize; start = file.tellg())
+//    {
+//        if(start + block_size >= fsize)
+//        {
+//            blocks.emplace_back(Block{start, fsize});
+//            break;
+//        }
+//        file.seekg(start + block_size);
+//        std::getline(file, line, '\n');
+//        if(file.tellg() < 0)
+//        {
+//            blocks.emplace_back(Block{start, fsize});
+//            break;
+//        }
+//        else
+//            blocks.emplace_back(Block{start, static_cast<std::size_t>(file.tellg())});
+//    }
     return blocks;
 }
 
 Framework::blocks_of_pairs_t Framework::map(const std::filesystem::path& fpath, const input_blocks_t& blocks)
 {
     std::vector<std::thread> mappers;
-    std::size_t nmappers = m_num_of_mappers;//(m_num_of_mappers == blocks.size()) ? m_num_of_mappers : blocks.size();
+    std::size_t nmappers = m_num_of_mappers;
+//    std::size_t nmappers = (m_num_of_mappers == blocks.size()) ? m_num_of_mappers : blocks.size();
     mappers.reserve(nmappers);
     blocks_of_pairs_t result(nmappers, pairs_t{});
     for(std::size_t cntr{0}; cntr < nmappers; ++cntr)

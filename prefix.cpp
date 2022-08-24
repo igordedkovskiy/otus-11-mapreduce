@@ -29,7 +29,8 @@ void mapper(const std::filesystem::__cxx11::path &fpath, const mapreduce::Block 
             longest_common_prefix = std::move(prefix);
         s1 = std::move(s2);
     }
-    while(block.m_end >= static_cast<decltype(block.m_end)>(file.tellg()));
+    //while(block.m_end > static_cast<decltype(block.m_end)>(file.tellg()));
+    while(block.m_end >= file.tellg() && file.tellg() > 0);
     out.insert(std::make_pair(std::move(longest_common_prefix), longest_common_prefix.size()));
 }
 
