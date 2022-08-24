@@ -30,7 +30,7 @@ void mapper(const std::filesystem::__cxx11::path &fpath, const mapreduce::Block 
         s1 = std::move(s2);
     }
     while(block.m_end >= static_cast<decltype(block.m_end)>(file.tellg()));
-    out.emplace_back(std::make_pair(std::move(longest_common_prefix), longest_common_prefix.size()));
+    out.insert(std::make_pair(std::move(longest_common_prefix), longest_common_prefix.size()));
 }
 
 void reducer(const pairs_t &in, pairs_t &out)
@@ -39,7 +39,7 @@ void reducer(const pairs_t &in, pairs_t &out)
     {
         return l.second < r.second;
     };
-    out.emplace_back(*std::max_element(std::begin(in), std::end(in), cmp));
+    out.insert(*std::max_element(std::begin(in), std::end(in), cmp));
 }
 
 }

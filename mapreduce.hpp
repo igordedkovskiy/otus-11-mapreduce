@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 #include <list>
+#include <map>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -26,7 +27,8 @@ class Framework
 public:
     using KeyT = std::string;
     using pair_t = std::pair<KeyT, std::size_t>;
-    using pairs_t = std::list<pair_t>;
+    //using pairs_t = std::list<pair_t>;
+    using pairs_t = std::multimap<KeyT, std::size_t>;
     using blocks_of_pairs_t = std::vector<pairs_t>;
 
     using MapperT = void(const std::filesystem::path&, const mapreduce::Block&, pairs_t&);
