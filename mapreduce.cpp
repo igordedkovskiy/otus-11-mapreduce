@@ -39,12 +39,15 @@ void mapreduce::Framework::run(const std::filesystem::path& input, const std::fi
 {
     auto blocks {split_input(input)};
     auto mapped {map(input, blocks)};
+    blocks.clear();
     auto shuffled {shuffle(mapped)};
+    mapped.clear();
     auto result {reduce(shuffled)};
+    shuffled.clear();
     // write into output
     std::fstream file {output.string(), std::ios::out};
     for(const auto& el:result)
-        file << el.first << ';' << el.second << '\n';
+        file << el.first << ' ' << el.second << '\n';
 }
 
 Framework::input_blocks_t Framework::split_input(const std::filesystem::path& file_path)
@@ -66,9 +69,14 @@ Framework::input_blocks_t Framework::split_input(const std::filesystem::path& fi
         }
         file.seekg(start + block_size);
         std::getline(file, line, '\n');
-        const std::size_t end = file.tellg();
-        blocks.emplace_back(Block{start, end});
-        start = end + 1;
+        if(file.tellg() < 0)
+        {
+            blocks.emplace_back(Block{start, fsize});
+            break;
+        }
+        else
+            blocks.emplace_back(Block{start, static_cast<std::size_t>(file.tellg())});
+        start = file.tellg();
     }
     return blocks;
 }
