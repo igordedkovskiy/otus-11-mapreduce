@@ -62,6 +62,22 @@ target_link_libraries(prefix_lib PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
+add_library(wcount_lib
+    "words_count.hpp"
+    "words_count.cpp"
+)
+set_target_properties(wcount_lib PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+target_include_directories(wcount_lib PRIVATE
+    ${CMAKE_BINARY_DIR}
+)
+target_link_libraries(wcount_lib PRIVATE
+    framework_lib
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+
 add_executable(${PROJECT_NAME}
     "main.cpp"
 )
@@ -74,6 +90,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE
     prefix_lib
+    wcount_lib
     framework_lib
     ${CMAKE_THREAD_LIBS_INIT}
 )
@@ -147,6 +164,7 @@ if(WITH_GTEST)
         gtest
         gtest_main
         prefix_lib
+        wcount_lib
         ${CMAKE_THREAD_LIBS_INIT}
     )
 endif()

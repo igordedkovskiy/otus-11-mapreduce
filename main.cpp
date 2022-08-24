@@ -4,6 +4,7 @@
 #include <type_traits>
 
 #include "prefix.hpp"
+#include "words_count.hpp"
 
 //int main(int argc, char* argv[])
 //{
@@ -51,61 +52,7 @@ int main()
 
     std::filesystem::path input("../tests/wcount-input.txt");
     std::filesystem::path output("../tests/wcount-out.txt");
-    auto mapper = [](const std::filesystem::path &fpath, const mapreduce::Block &block, mapreduce::Framework::pairs_t &out)
-    {
-        std::fstream file{fpath.string(), std::ios::in};
-        file.seekg(block.m_start);
-
-        std::string tmp(block.m_end - block.m_start, ' ');
-        {
-            std::fstream file{fpath.string(), std::ios::in};
-            file.seekg(block.m_start);
-            std::getline(file, tmp);
-        }
-
-        std::string s;
-        do
-        {
-            file >> s;
-            if(s.empty())
-                continue;
-
-            for(auto& c:s)
-                c = std::tolower(c);
-
-            std::string alpha;
-            std::copy_if(s.begin(), s.end(), std::back_inserter(alpha), [](unsigned char c) {return std::isalpha(c) || std::isspace(c); });
-            s.swap(alpha);
-
-            auto el = out.find(s);
-            if(el != std::end(out))
-                ++el->second;
-            else
-                out.insert(std::make_pair(std::move(s), 1));
-        }
-        while(block.m_end > static_cast<decltype(block.m_end)>(file.tellg()));
-    };
-    auto reducer = [](const mapreduce::Framework::pairs_t &in, mapreduce::Framework::pairs_t &out)
-    {
-        for(auto it {std::begin(in)}; it != std::end(in);)
-        {
-            auto range {in.equal_range(it->first)};
-            std::size_t count{0};
-            for(auto it2{range.first}; it2 != range.second; ++it2)
-                count += it2->second;
-            out.insert(std::make_pair(std::move(range.first->first), count));
-            it = range.second;
-        }
-    };
-    try
-    {
-        mapreduce::Framework mr{mapper, 5, reducer, 3};
-        mr.run(input, output);
-    }
-    catch(std::exception& e)
-    {
-        std::cerr << e.what() << std::endl;
-    }
-
+    mapreduce::Framework mr{mapreduce_words_count::mapper, 1, mapreduce_words_count::reducer, 1};
+    mr.run(input, output);
     return 0;
 }

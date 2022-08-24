@@ -60,11 +60,11 @@ Framework::input_blocks_t Framework::split_input(const std::filesystem::path& fi
     blocks.reserve(m_num_of_mappers);
     std::fstream file{file_path.string(), std::ios::in};
     std::string line;
-    for(std::size_t start{0}; start < fsize;)
+    for(std::size_t start = file.tellg(); start < fsize; start = file.tellg())
     {
         if(start + block_size >= fsize)
         {
-            blocks.emplace_back(Block{start, fsize - 1});
+            blocks.emplace_back(Block{start, fsize});
             break;
         }
         file.seekg(start + block_size);
@@ -76,7 +76,6 @@ Framework::input_blocks_t Framework::split_input(const std::filesystem::path& fi
         }
         else
             blocks.emplace_back(Block{start, static_cast<std::size_t>(file.tellg())});
-        start = file.tellg();
     }
     return blocks;
 }
@@ -84,9 +83,10 @@ Framework::input_blocks_t Framework::split_input(const std::filesystem::path& fi
 Framework::blocks_of_pairs_t Framework::map(const std::filesystem::path& fpath, const input_blocks_t& blocks)
 {
     std::vector<std::thread> mappers;
-    mappers.reserve(m_num_of_mappers);
-    blocks_of_pairs_t result(m_num_of_mappers, pairs_t{});
-    for(std::size_t cntr{0}; cntr < m_num_of_mappers; ++cntr)
+    std::size_t nmappers = m_num_of_mappers;//(m_num_of_mappers == blocks.size()) ? m_num_of_mappers : blocks.size();
+    mappers.reserve(nmappers);
+    blocks_of_pairs_t result(nmappers, pairs_t{});
+    for(std::size_t cntr{0}; cntr < nmappers; ++cntr)
         mappers.emplace_back(std::thread{m_mapper,
                                          std::ref(fpath),
                                          std::ref(blocks[cntr]),

@@ -1,4 +1,4 @@
-A MapReduce program is composed of a map procedure, which performsfiltering
+A MapReduce program is composed of a map procedure, which performs filtering
 and sorting (such as sorting students by first name into queues, one queue
 for each name), and a reduce method, which performs a summary operation (such
 as counting the number of students in each queue, yielding name frequencies).
