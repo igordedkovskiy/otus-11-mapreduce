@@ -10,9 +10,13 @@ option(GIT_SUBMODULE "Check submodules during build" ON)
 
 configure_file(version.h.in version.h)
 
-find_package(Boost COMPONENTS system REQUIRED)
-
 find_package(Threads REQUIRED)
+find_package(Boost COMPONENTS system REQUIRED)
+find_package(Boost COMPONENTS program_options REQUIRED)
+if(NOT Boost_FOUND)
+    print("Boost was not found")
+endif()
+
 
 add_library(framework_lib
     "mapreduce.hpp"
@@ -63,6 +67,8 @@ target_link_libraries(wcount_lib PRIVATE
 
 add_executable(${PROJECT_NAME}
     "main.cpp"
+    "input.hpp"
+    "input.cpp"
 )
 set_target_properties(${PROJECT_NAME} PROPERTIES
     CXX_STANDARD 20
@@ -70,12 +76,14 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_BINARY_DIR}
+    ${Boost_INCLUDE_DIR}
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE
     framework_lib
     prefix_lib
     wcount_lib
     ${CMAKE_THREAD_LIBS_INIT}
+    ${Boost_LIBRARIES}
 )
 
 if(WITH_GTEST)
