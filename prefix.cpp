@@ -3,7 +3,7 @@
 namespace mapreduce_prefix
 {
 
-void mapper(const std::filesystem::__cxx11::path &fpath, const mapreduce::Block &block, pairs_t &out)
+void mapper(const std::filesystem::path &fpath, const mapreduce::Block &block, pairs_t &out)
 {
     auto common_prefix = [](const std::string& s1, const std::string& s2)
     {
@@ -17,20 +17,19 @@ void mapper(const std::filesystem::__cxx11::path &fpath, const mapreduce::Block 
         return (s1.size() <= s2.size()) ? s1 : s2;
     };
 
-    std::fstream file{fpath.string(), std::ios::in};
+    std::fstream file{fpath.string(), std::ios::in | std::ios::binary};
     file.seekg(block.m_start);
     std::string s1, s2, longest_common_prefix;
-    std::getline(file, s1, '\n');
-    do
+    std::getline(file, s1);
+    longest_common_prefix = s1[0];
+    while(file.tellg() >= 0 && static_cast<std::size_t>(file.tellg()) < block.m_end)
     {
-        std::getline(file, s2, '\n');
+        std::getline(file, s2);
         auto prefix {common_prefix(s1, s2)};
         if(prefix.size() > longest_common_prefix.size())
             longest_common_prefix = std::move(prefix);
         s1 = std::move(s2);
     }
-    //while(block.m_end > static_cast<decltype(block.m_end)>(file.tellg()));
-    while(block.m_end >= file.tellg() && file.tellg() > 0);
     out.insert(std::make_pair(std::move(longest_common_prefix), longest_common_prefix.size()));
 }
 

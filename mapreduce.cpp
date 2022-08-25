@@ -53,55 +53,41 @@ void mapreduce::Framework::run(const std::filesystem::path& input, const std::fi
 Framework::input_blocks_t Framework::split_input(const std::filesystem::path& file_path)
 {
     const auto fsize{std::filesystem::file_size(file_path)};
-//    const auto block_size{(fsize % m_num_of_mappers ?
-//                           fsize / m_num_of_mappers :
-//                           fsize / m_num_of_mappers + 1)};
-    const auto block_size {fsize / m_num_of_mappers};
+    const auto block_size{(fsize % m_num_of_mappers ?
+                           fsize / m_num_of_mappers + 1 :
+                           fsize / m_num_of_mappers)};
     input_blocks_t blocks;
     blocks.reserve(m_num_of_mappers);
-    std::fstream file{file_path.string(), std::ios::in};
-    std::string line;
-    for(std::size_t cntr{0}, start = file.tellg(); cntr < m_num_of_mappers; ++cntr, start = file.tellg())
+    std::fstream file{file_path.string(), std::ios::in | std::ios::binary};
+    for(std::size_t start{0}; start + block_size - 1 < fsize;)
     {
-        file.seekg(start + block_size);
-        std::getline(file, line, '\n');
-        if(file.tellg() < 0)
+        const auto cur {start + block_size - 1};
+        if(cur >= fsize)
         {
             blocks.emplace_back(Block{start, fsize});
             break;
         }
-        else
-            blocks.emplace_back(Block{start, static_cast<std::size_t>(file.tellg())});
+        std::string s;
+        file.seekg(cur);
+        std::getline(file, s);
+        std::size_t end {(file.tellg() < 0) ? fsize : static_cast<decltype(end)>(file.tellg())};
+        blocks.emplace_back(Block{start, end});
+        start = end;
     }
-    if(file.tellg())
-        blocks.back().m_end = fsize;
-
-//    for(std::size_t start = file.tellg(); start < fsize; start = file.tellg())
-////    for(std::size_t start = 0; start < fsize; start = file.tellg())
-//    {
-//        if(start + block_size >= fsize)
-//        {
-//            blocks.emplace_back(Block{start, fsize});
-//            break;
-//        }
-//        file.seekg(start + block_size);
-//        std::getline(file, line, '\n');
-//        if(file.tellg() < 0)
-//        {
-//            blocks.emplace_back(Block{start, fsize});
-//            break;
-//        }
-//        else
-//            blocks.emplace_back(Block{start, static_cast<std::size_t>(file.tellg())});
-//    }
+    if(blocks.back().m_end < fsize)
+    {
+        if(blocks.size() < m_num_of_mappers)
+            blocks.emplace_back(Block{blocks.back().m_end, fsize});
+        else
+            blocks.back().m_end = fsize;
+    }
     return blocks;
 }
 
 Framework::blocks_of_pairs_t Framework::map(const std::filesystem::path& fpath, const input_blocks_t& blocks)
 {
+    const std::size_t nmappers {(m_num_of_mappers == blocks.size()) ? m_num_of_mappers : blocks.size()};
     std::vector<std::thread> mappers;
-    std::size_t nmappers = m_num_of_mappers;
-//    std::size_t nmappers = (m_num_of_mappers == blocks.size()) ? m_num_of_mappers : blocks.size();
     mappers.reserve(nmappers);
     blocks_of_pairs_t result(nmappers, pairs_t{});
     for(std::size_t cntr{0}; cntr < nmappers; ++cntr)
@@ -117,8 +103,9 @@ Framework::blocks_of_pairs_t Framework::map(const std::filesystem::path& fpath, 
 Framework::blocks_of_pairs_t Framework::shuffle(blocks_of_pairs_t& mapped)
 {
     // shuffle. Keep sorted
-    blocks_of_pairs_t shuffled{m_num_of_reducers, blocks_of_pairs_t::value_type{}};
-    shuffled.reserve(m_num_of_reducers);
+    const std::size_t nreducers {(m_num_of_reducers < mapped.size()) ? m_num_of_reducers : mapped.size()};
+    blocks_of_pairs_t shuffled{nreducers, blocks_of_pairs_t::value_type{}};
+    shuffled.reserve(nreducers);
 
     auto find = [&shuffled](const KeyT& key)
     {
@@ -153,10 +140,11 @@ Framework::blocks_of_pairs_t Framework::shuffle(blocks_of_pairs_t& mapped)
 
 Framework::pairs_t Framework::reduce(const blocks_of_pairs_t& shuffled)
 {
+    const std::size_t nreducers {(m_num_of_reducers == shuffled.size()) ? m_num_of_reducers : shuffled.size()};
     std::vector<std::thread> reducers;
-    reducers.reserve(m_num_of_reducers);
-    blocks_of_pairs_t im_result(m_num_of_reducers, pairs_t{});
-    for(std::size_t cntr{0}; cntr < m_num_of_reducers; ++cntr)
+    reducers.reserve(nreducers);
+    blocks_of_pairs_t im_result(nreducers, pairs_t{});
+    for(std::size_t cntr{0}; cntr < nreducers; ++cntr)
         reducers.emplace_back(std::thread{m_reducer,
                                           std::ref(shuffled[cntr]),
                                           std::ref(im_result[cntr])});

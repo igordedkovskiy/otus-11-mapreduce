@@ -1,4 +1,6 @@
 #include <cassert>
+//#include <boost/algorithm/string/split.hpp>
+//#include <boost/algorithm/string.hpp>
 #include "words_count.hpp"
 
 namespace mapreduce_words_count
@@ -6,52 +8,36 @@ namespace mapreduce_words_count
 
 void mapper(const std::filesystem::path &fpath, const mapreduce::Block &block, mapreduce::Framework::pairs_t &out)
 {
-    std::fstream file{fpath.string(), std::ios::in};
+    std::fstream file{fpath.string(), std::ios::in | std::ios::binary};
     file.seekg(block.m_start);
-
-//    {
-//        std::fstream file{fpath.string(), std::ios::in};
-//        file.seekg(block.m_start);
-//        std::string s, res;
-//        do
-//        {
-//            file >> s;
-//            for(auto& c:s)
-//                c = std::tolower(c);
-//            std::string alpha;
-//            std::copy_if(s.begin(), s.end(), std::back_inserter(alpha), [](unsigned char c) {return std::isalpha(c) || std::isspace(c); });
-//            s.swap(alpha);
-//            res += " " + std::move(s);
-//        }
-//        while(block.m_end > static_cast<decltype(block.m_end)>(file.tellg()));
-//        std::cout << res << std::endl;
-//    }
-
-    std::string s;
-    do
+    std::string word;
+    while(file.tellg() >= 0 && static_cast<std::size_t>(file.tellg()) < block.m_end)
     {
-        file >> s;
+        std::getline(file, word);
+        std::vector<std::string> words;
+//        const char* delim = " ";
+//        boost::algorithm::split(words, std::move(word), boost::algorithm::is_any_of(delim), boost::token_compress_on);
+//        for(auto& word:words)
+        std::stringstream s{std::move(word)};
+        while(s >> word)
+        {
+//            if(word.back() == '\r')
+//                word.resize(word.size() - 1);
+            for(auto& c:word)
+                c = std::tolower(c);
 
-        assert(file.tellg() == file.tellg());
+            std::string alpha;
+            std::copy_if(word.begin(), word.end(), std::back_inserter(alpha),
+                         [](unsigned char c) { return std::isalpha(c); });
+            word.swap(alpha);
 
-        for(auto& c:s)
-            c = std::tolower(c);
-
-        std::string alpha;
-        std::copy_if(s.begin(), s.end(), std::back_inserter(alpha),
-                     [](unsigned char c) {return std::isalpha(c) || std::isspace(c); });
-        s.swap(alpha);
-
-        auto el = out.find(s);
-        if(el != std::end(out))
-            ++el->second;
-        else
-            out.insert(std::make_pair(std::move(s), 1));
+            auto el = out.find(word);
+            if(el != std::end(out))
+                ++el->second;
+            else
+                out.insert(std::make_pair(std::move(word), 1));
+        }
     }
-    while(block.m_end > file.tellg() && file.tellg() > 0);
-
-//    for(auto& [w, count]:out)
-//        std::cout << w << ' ' << count << std::endl << std::endl;
 }
 
 void reducer(const mapreduce::Framework::pairs_t &in, mapreduce::Framework::pairs_t &out)
