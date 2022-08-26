@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <thread>
 
 #include "input.hpp"
 
@@ -24,17 +25,21 @@ input_t parse_cmd_line(int argc, const char *argv[])
         return ret;
     };
 
+    const auto threads_limit {4 * std::thread::hardware_concurrency()};
+
     desc.add_options()
             ("help,h", "Help page")
-            ("input-file,s", po::value<std::string>()->required(), "input file")
+
+            ("input-file,s", po::value<std::string>()->required(),
+             "input file")
 
             ("num-of-mappers,m", po::value<std::size_t>()->required()
-             ->notifier(in(1, std::numeric_limits<std::size_t>::max(),
-                           "num-of-mappers")), "number of mappers")
+             ->notifier(in(1, threads_limit, "num-of-mappers")),
+             "number of mappers")
 
             ("num-of-reducers,r", po::value<std::size_t>()->required()
-             ->notifier(in(1, std::numeric_limits<std::size_t>::max(),
-                           "num-of-reducers")), "number of reducers")
+             ->notifier(in(1, threads_limit, "num-of-reducers")),
+             "number of reducers")
             ;
 
     po::positional_options_description positionalDescription;
@@ -54,14 +59,17 @@ input_t parse_cmd_line(int argc, const char *argv[])
     if(vm.count("help"))
     {
         std::cout << "Usage: " << argv[0] << " <input-file> <num-of-mappers> <num-of-reducers>\n";
+        std::cout << "num-of-mappers  = [" << 1 << ';' << threads_limit << "]\n";
+        std::cout << "num-of-reducers = [" << 1 << ';' << threads_limit << "]\n";
+        std::cout << "num-of-mappers >=  num-of-reducers\n\n";
         std::cout << desc;
         return std::make_pair(vm, false);
     }
 
     if(vm["num-of-reducers"].as<std::size_t>() > vm["num-of-mappers"].as<std::size_t>())
     {
-        std::cout << "Number of reducers must be equal or less than number of mappers."
-                  << " Run again" << std::endl;
+        std::cout << "Contraint violated: ";
+        std::cout << "num-of-mappers >=  num-of-reducers\n";
         return std::make_pair(vm, false);
     }
 
