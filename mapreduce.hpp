@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <vector>
-#include <list>
 #include <map>
 #include <filesystem>
 #include <fstream>
@@ -10,8 +9,6 @@
 #include <thread>
 #include <exception>
 #include <iostream>
-
-template<typename T> struct TD;
 
 namespace mapreduce
 {
@@ -27,20 +24,11 @@ class Framework
 public:
     using KeyT = std::string;
     using pair_t = std::pair<KeyT, std::size_t>;
-    //using pairs_t = std::list<pair_t>;
     using pairs_t = std::multimap<KeyT, std::size_t>;
     using blocks_of_pairs_t = std::vector<pairs_t>;
 
     using MapperT = void(const std::filesystem::path&, const mapreduce::Block&, pairs_t&);
     using ReducerT = void(const pairs_t&, pairs_t&);
-
-    struct exception: public std::exception
-    {
-        exception(const std::string& m);
-        exception(std::string&& m) noexcept;
-        const char* what() const noexcept;
-        std::string m_message;
-    };
 
 public:
     template<typename M, typename R>
@@ -83,7 +71,6 @@ Framework::Framework(const M& mapper, std::size_t num_of_mappers,
         m_num_of_reducers = m_num_of_mappers;
         std::cerr << "Entered number of reducers is greater than number of mappers."
                      "Therefore number of reducers is set equal to number of mappers" << std::endl;
-//        throw exception("Number of reducers is greater than number of mappers");
     }
 }
 

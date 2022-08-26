@@ -1,6 +1,4 @@
 #include <cassert>
-//#include <boost/algorithm/string/split.hpp>
-//#include <boost/algorithm/string.hpp>
 #include "words_count.hpp"
 
 namespace mapreduce_words_count
@@ -15,14 +13,9 @@ void mapper(const std::filesystem::path &fpath, const mapreduce::Block &block, m
     {
         std::getline(file, word);
         std::vector<std::string> words;
-//        const char* delim = " ";
-//        boost::algorithm::split(words, std::move(word), boost::algorithm::is_any_of(delim), boost::token_compress_on);
-//        for(auto& word:words)
         std::stringstream s{std::move(word)};
         while(s >> word)
         {
-//            if(word.back() == '\r')
-//                word.resize(word.size() - 1);
             for(auto& c:word)
                 c = std::tolower(c);
 

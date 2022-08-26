@@ -6,6 +6,8 @@
 
 #include "mapreduce.hpp"
 
+/// \brief Mapper and reducer for finding a frequency of appearance
+///        of each word in the text
 namespace mapreduce_words_count
 {
 

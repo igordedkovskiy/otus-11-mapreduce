@@ -6,6 +6,8 @@
 
 #include "mapreduce.hpp"
 
+/// \brief Mapper and reducer for finding shortest prefix, that uniquely
+///        identifies the string in the text
 namespace mapreduce_prefix
 {
 

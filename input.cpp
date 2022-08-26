@@ -24,12 +24,6 @@ input_t parse_cmd_line(int argc, const char *argv[])
         return ret;
     };
 
-//    desc.add_options()
-//            ("input-file,s", po::value<std::string>()->required(), "input file")
-//            ("num-of-mappers,m", po::value<std::string>()->required())//->notifier(in(-5, 10, "num-of-mappers")), "number of mappers")
-//            ("num-of-reducers,r", po::value<std::size_t>()->required()->notifier(in(1, 10, "num-of-reducers")), "number of reducers")
-//            ("help,h", "Help page")
-//            ;
     desc.add_options()
             ("help,h", "Help page")
             ("input-file,s", po::value<std::string>()->required(), "input file")
@@ -56,12 +50,21 @@ input_t parse_cmd_line(int argc, const char *argv[])
               .run()
               ,
               vm);
+
     if(vm.count("help"))
     {
         std::cout << "Usage: " << argv[0] << " <input-file> <num-of-mappers> <num-of-reducers>\n";
         std::cout << desc;
         return std::make_pair(vm, false);
     }
+
+    if(vm["num-of-reducers"].as<std::size_t>() > vm["num-of-mappers"].as<std::size_t>())
+    {
+        std::cout << "Number of reducers must be equal or less than number of mappers."
+                  << " Run again" << std::endl;
+        return std::make_pair(vm, false);
+    }
+
     po::notify(vm);
 
     return std::make_pair(vm, true);
